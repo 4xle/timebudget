@@ -6,6 +6,7 @@ timebudget.report_at_exit()
 def possibly_slow():
     print("slow")
     time.sleep(0.6)
+    
 
 @timebudget
 def should_be_fast():
