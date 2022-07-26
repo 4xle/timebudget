@@ -40,12 +40,13 @@ class TimeBudgetRecorder():
     This is mostly used through annotation and with-block helpers.
     """
 
-    def __init__(self, quiet_mode:bool=False):
+    def __init__(self, quiet_mode:bool=False,units='millisecond'):
         self.quiet_mode = quiet_mode
         self.reset()
         self.out_stream = sys.stdout
         self.ureg = UnitRegistry()
         self.ureg.define('cycle = 1 * turn = cyc')
+        self.timeunit = self.ureg[units]
 
     def reset(self):
         """Clear all stats collected so far.
@@ -77,7 +78,7 @@ class TimeBudgetRecorder():
         if block_name not in self.start_times:
             warnings.warn(f"timebudget is confused: timebudget.end({block_name}) without start")
             return float('NaN')
-        elapsed = (time.monotonic_ns() - self.start_times[block_name]) * self.ureg.nanosecond
+        elapsed = ((time.monotonic_ns() - self.start_times[block_name]) * self.ureg.nanosecond).to(self.timeunit)
         if block_name not in self.elapsed_total:
             self.elapsed_total[block_name] = [elapsed]
         else:
@@ -85,7 +86,7 @@ class TimeBudgetRecorder():
         # self.elapsed_cnt[block_name] += 1
         del self.start_times[block_name]
         if not quiet:
-            self._print(f"{block_name} took {elapsed.to_compact()}")
+            self._print(f"{block_name} took {elapsed.to(self.timeunit)}")
         return elapsed
 
     # def time_format(self, ns_duration:int) -> str:
@@ -94,7 +95,7 @@ class TimeBudgetRecorder():
     #     return value.to_compact()
 
 
-    def report(self, percent_of:str=None, reset:bool=False, uniform_units:bool = False):
+    def report(self, percent_of:str=None, reset:bool=False):
         """Prints a report summarizing all the times recorded by timebudget.
         If percent_of is specified, then times are shown as a percent of that function.
         If `reset` is set, then all stats will be cleared after this report.
@@ -110,9 +111,9 @@ class TimeBudgetRecorder():
             maxVal = max(timeValues)
             diff = maxVal - minVal
             # have to get the unitless value and reinitialize it, otherwise pint tries to do odd things to the representation
-            sd = (avg.m**0.5) * self.ureg.nanosecond
+            sd = (avg.m**0.5) * self.timeunit
             # same thing here, subtracting ns - ns/cycle doesn't work out nicely
-            unitlessAvg = avg.to_tuple()[0] * self.ureg.nanosecond
+            unitlessAvg = avg.to_tuple()[0] * self.timeunit
             var = sum([(x - unitlessAvg)**2 for x in timeValues])/len(timeValues)
             results.append({
                 'name': name,
@@ -137,16 +138,26 @@ class TimeBudgetRecorder():
                 avg = res['total'] / total_cnt
                 pct = 100.0 * res['total'] / total_elapsed
                 avg_cnt = res['cnt'] / total_cnt
-                self._print(f"{res['name']:>25s}:{pct: 6.1f~#P}% avg {avg:8.3f~#P},sd {res['sd']:8.3f~#P}, var {res['var']:8.3f~#P}, range {res['diff']:8.3f~#P} @{avg_cnt:8.3f~#P} calls/cycle ")
+                if self.uniform_units:
+                    self._print(f"{res['name']:>25s}:{pct: 6.1f}% avg {avg:8.3f},sd {res['sd']:8.3f}, var {res['var']:8.3f}, range {res['diff']:8.3f} @{avg_cnt:8.3f} calls/cycle ")
+                else:
+                    self._print(f"{res['name']:>25s}:{pct: 6.1f~#P}% avg {avg:8.3f~#P},sd {res['sd']:8.3f~#P}, var {res['var']:8.3f~#P}, range {res['diff']:8.3f~#P} @{avg_cnt:8.3f~#P} calls/cycle ")
         else:
             self._print("timebudget report...")
             for res in results:
                 # print(res)
                 # diff = res['max'] - res['min']
                 # sd = (res['avg'].m**0.5) * self.ureg.ns
-                self._print(f"{res['name']:>25}:{res['avg']:8.3f~#P} avg,sd {res['sd']:8.3f~#P}, var {res['var']:8.3f~#P}, range {res['diff']:8.3f~#P} for {res['cnt']: 6d} calls")
+
+
+                if self.uniform_units:
+                    self._print(f"{res['name']:>25}:{res['avg']:8.3f~P} avg,sd {res['sd']:8.3f~P}, var {res['var']:8.3f~P}, range {res['diff']:8.3f~P} for {res['cnt']: 6d~P} calls")
+                else:
+                    self._print(f"{res['name']:>25}:{res['avg']:8.3f~#P} avg,sd {res['sd']:8.3f~#P}, var {res['var']:8.3f~#P}, range {res['diff']:8.3f~#P} for {res['cnt']: 6d} calls")
         if reset:
             self.reset()
+
+        
 
 
 _default_recorder = TimeBudgetRecorder()  
@@ -197,6 +208,10 @@ def set_quiet(quiet:bool=True):
     """
     _default_recorder.quiet_mode = quiet
 
+def set_units(units='millisecond',uniform_units=True):
+    _default_recorder.timeunit = _default_recorder.ureg[units]
+    _default_recorder.uniform_units = uniform_units
+
 
 # Create shortcuts for export
 timebudget = annotate_or_with_block
@@ -205,12 +220,14 @@ timebudget.report = report
 timebudget.__doc__ = __doc__
 timebudget.set_quiet = set_quiet
 timebudget._default_recorder = _default_recorder
+timebudget.set_units = set_units
 
-def report_at_exit(block_name:str=None):
+def report_at_exit(block_name:str=None, uniform_units=True):
     if block_name:
-        atexit.register(lambda: report(block_name))
+        atexit.register(lambda: report(block_name, uniform_units))
     else:
         atexit.register(report)
+
 
 timebudget.report_at_exit = report_at_exit
 timebudget.report_atexit = report_at_exit  # for backwards compat with v0.6

@@ -1,5 +1,6 @@
 import time
 from timebudget import timebudget
+timebudget.set_units("microsecond")
 timebudget.report_at_exit()
 
 @timebudget
