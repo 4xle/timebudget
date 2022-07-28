@@ -69,6 +69,7 @@ class TimeBudgetRecorder():
             # try/finally should prevent this, but sometimes it doesn't.
             warnings.warn(f"timebudget is confused: timebudget.start({block_name}) without end")
         self.start_times[block_name] = time.monotonic_ns()
+        # print(f"{self.start_times[block_name]=}")
 
     def end(self, block_name:str, quiet:Optional[bool]=None) -> float:
         """Returns number of ms spent in this block this time.
@@ -78,7 +79,8 @@ class TimeBudgetRecorder():
         if block_name not in self.start_times:
             warnings.warn(f"timebudget is confused: timebudget.end({block_name}) without start")
             return float('NaN')
-        elapsed = ((time.monotonic_ns() - self.start_times[block_name]))
+        elapsed = (time.monotonic_ns() - self.start_times[block_name])
+        # print(f"{elapsed=}")
         if block_name not in self.elapsed_total:
             self.elapsed_total[block_name] = [elapsed]
         else:
@@ -86,7 +88,8 @@ class TimeBudgetRecorder():
         # self.elapsed_cnt[block_name] += 1
         del self.start_times[block_name]
         if not quiet:
-            self._print(f"{block_name} took {elapsed.to(self.timeunit)}")
+            self._print(f"{block_name} took {(elapsed * self.ureg.nanosecond).to(self.timeunit)}")
+            # pass
         return elapsed
 
     # def time_format(self, ns_duration:int) -> str:
@@ -101,34 +104,45 @@ class TimeBudgetRecorder():
         If `reset` is set, then all stats will be cleared after this report.
         If `uniform_units` is set, then all time values will use the same (smallest) unit value.
         """
-        print("Adjusting timeunits, please wait...")
-        for k,v in self.elapsed_total.items():
-            v = [(v * self.ureg.nanosecond).to(self.timeunit)]
+        # print("Adjusting timeunits, please wait...")
+        # for k,v in self.elapsed_total.items():
+        #     print(k)
+        #     print(v)
+        #     self.elapsed_total[k] = [(x * self.ureg.nanosecond) for x in v]
+        #     print(self.elapsed_total[k])
+            # print(v)
+            # self.elapsed_total[k] = 
 
         results = []
         for name, timeValues in self.elapsed_total.items():
             # timeValues = self.elapsed_total[name]
-            total = sum(timeValues)
-            cnt = len(timeValues) * self.ureg.cycle
-            avg = (total/cnt)
-            minVal = min(timeValues)
-            maxVal = max(timeValues)
+            total = sum(timeValues) 
+            totalTimed = (total* self.ureg.nanosecond).to(self.timeunit)
+            # print(f"{total=}")
+            cnt = len(timeValues)
+            cycles = cnt * self.ureg.cycle
+            avg = total/cnt
+            avgTimed = totalTimed/cycles
+            minVal = (min(timeValues)* self.ureg.nanosecond).to(self.timeunit)
+            maxVal = (max(timeValues)* self.ureg.nanosecond).to(self.timeunit)
             diff = maxVal - minVal
             # have to get the unitless value and reinitialize it, otherwise pint tries to do odd things to the representation
-            sd = (avg.m**0.5) * self.timeunit
+            sd = (avg**0.5) * self.timeunit
             # same thing here, subtracting ns - ns/cycle doesn't work out nicely
-            unitlessAvg = avg.to_tuple()[0] * self.timeunit
-            var = sum([(x - unitlessAvg)**2 for x in timeValues])/len(timeValues)
+            
+            # print(f"{avg=}")
+            var = sum([(x - avg)**2 for x in timeValues])
+            varTimed = (var * self.ureg.nanosecond**2).to(self.timeunit**2)
             results.append({
                 'name': name,
-                'total': total,
-                'cnt': cnt,
-                'avg': avg,
+                'total': totalTimed,
+                'cnt': cycles,
+                'avg': avgTimed,
                 'min': minVal,
                 'max': maxVal,
                 'diff': diff,
                 'sd':sd,
-                'var':var
+                'var':varTimed
 
             })
         results = sorted(results, key=lambda r: r['total'], reverse=True)
