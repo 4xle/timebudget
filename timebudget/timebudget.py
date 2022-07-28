@@ -78,11 +78,11 @@ class TimeBudgetRecorder():
         if block_name not in self.start_times:
             warnings.warn(f"timebudget is confused: timebudget.end({block_name}) without start")
             return float('NaN')
-        elapsed = ((time.monotonic_ns() - self.start_times[block_name]) * self.ureg.nanosecond).to(self.timeunit)
+        elapsed = ((time.monotonic_ns() - self.start_times[block_name]))
         if block_name not in self.elapsed_total:
             self.elapsed_total[block_name] = [elapsed]
         else:
-            self.elapsed_total[block_name] += [elapsed]
+            self.elapsed_total[block_name].append(elapsed)
         # self.elapsed_cnt[block_name] += 1
         del self.start_times[block_name]
         if not quiet:
@@ -101,6 +101,10 @@ class TimeBudgetRecorder():
         If `reset` is set, then all stats will be cleared after this report.
         If `uniform_units` is set, then all time values will use the same (smallest) unit value.
         """
+        print("Adjusting timeunits, please wait...")
+        for k,v in elapsed_total.items():
+            v = [(v * self.ureg.nanosecond).to(self.timeunit)]
+
         results = []
         for name, timeValues in self.elapsed_total.items():
             # timeValues = self.elapsed_total[name]
