@@ -102,7 +102,7 @@ class TimeBudgetRecorder():
         If `uniform_units` is set, then all time values will use the same (smallest) unit value.
         """
         print("Adjusting timeunits, please wait...")
-        for k,v in elapsed_total.items():
+        for k,v in self.elapsed_total.items():
             v = [(v * self.ureg.nanosecond).to(self.timeunit)]
 
         results = []
