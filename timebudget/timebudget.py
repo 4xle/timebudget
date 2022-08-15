@@ -100,6 +100,9 @@ class TimeBudgetRecorder():
 
 
     def _formatResults(self, res, cycles,avg = 0, pct = 0, avg_cnt = 0):
+
+
+
         if self.uniform_units:
             formattedDict = {
                 'name': f"{res['name']:>25s}",
@@ -128,6 +131,7 @@ class TimeBudgetRecorder():
                 'sd':f"{res['sd']:8.3f~#P}",
                 'var':f"{res['var']:8.3f~#P}"
             }
+
         return formattedDict
 
 
@@ -191,7 +195,7 @@ class TimeBudgetRecorder():
                 avg_cnt = res['cnt'] / total_cnt
 
 
-                formattedDict = self._formatResults(res, avg, pct, avg_cnt,cycles)
+                formattedDict = self._formatResults(res, cycle, avg,pct,avg_cnt)
 
                 self._print(f"{formattedDict['name']}:{formattedDict['pct']}% avg, sd {formattedDict['sd']}, var {formattedDict['var']}, min {formattedDict['min']}, max {formattedDict['max']}, range {formattedDict['diff']}, {formattedDict['avg_cnt']} calls/cycle, total time:{formattedDict['total']}")
 
