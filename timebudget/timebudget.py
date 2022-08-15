@@ -25,7 +25,13 @@ import sys
 import time
 from typing import Callable, Optional, Union
 import warnings
-from pint import UnitRegistry
+import pint
+import pandas as pd
+from numpy import nan,ptp
+import pint_pandas
+pint_pandas.PintType.ureg.default_format = "~P"
+from rich_dataframe import prettify
+from pprint import pprint
 
 
 __all__ = [
@@ -44,10 +50,21 @@ class TimeBudgetRecorder():
         self.quiet_mode = quiet_mode
         self.reset()
         self.out_stream = sys.stdout
-        self.ureg = UnitRegistry()
+        self.ureg = pint.UnitRegistry()
+        pint.set_application_registry(self.ureg)
         self.ureg.define('cycle = 1 * turn = cyc')
+        self.ureg.define('fraction = [] = frac')
+        self.ureg.define('percent = 1e-2 frac = pct')
+        self.ureg.define('ppm = 1e-6 fraction')
         self.timeunit = self.ureg[units]
         self.uniform_units = uniform_units
+        if self.uniform_units:
+            self.ureg.default_format='~'
+            pint_pandas.PintType.ureg.default_format = "~"
+        else:
+            self.ureg.default_format='~#P'
+            pint_pandas.PintType.ureg.default_format = "~#P"
+
 
     def reset(self):
         """Clear all stats collected so far.
@@ -132,95 +149,139 @@ class TimeBudgetRecorder():
         return formattedDict
 
 
+    def _findSmallestPintUnit(self, quantity):
+        # print(quantity)
+        print(quantity.to_compact().units)
+        return quantity.to_compact().units
+
+
+
+    def _compileResults(self):
+
+
+        internalData= {k:pd.Series(v,dtype=f"pint[nanosecond]") for k,v in self.elapsed_total.items()}
+
+        internalDataFrame = pd.DataFrame(internalData).T
+        originalDtypes = internalDataFrame.dtypes
+        # print(originalDtypes)
+        internalDataFrame = internalDataFrame.pint.dequantify()
+
+        numberOfRows = len(internalDataFrame.index)
+        rangeForDataRows = range(0,numberOfRows)
+
+        timeFields = ["avg","min","max","range","sum","sd","var"]
+        counterFields = ["calls"]
+        aggregateFields = ["pct"]
+        
+        reportDataFrame = pd.DataFrame(index=[k for k in self.elapsed_total])
+
+        # add the fields first in the desired order so that logical ops afterwards can be organized without impacting the table order
+        fieldsToAdd = timeFields + counterFields + aggregateFields
+        for f in fieldsToAdd:
+            reportDataFrame[f] = 0
+        # print(reportDataFrame)
+        
+        reportDataFrame['calls'] = pint_pandas.PintArray(internalDataFrame.count(axis=1),dtype=self.ureg.cycle)
+        reportDataFrame['sum'] = pint_pandas.PintArray(internalDataFrame.sum(axis=1,skipna=True),dtype=f"pint[nanosecond]")
+        reportDataFrame['avg'] = pint_pandas.PintArray(internalDataFrame.mean(axis=1,skipna=True).round(2),dtype=f"pint[nanosecond / {self.ureg.cycle}]")
+        
+        reportDataFrame['min'] = pint_pandas.PintArray(internalDataFrame.min(axis=1,skipna=True),dtype=f"pint[nanosecond]")
+        reportDataFrame['max'] = pint_pandas.PintArray(internalDataFrame.max(axis=1,skipna=True),dtype=f"pint[nanosecond]")
+        reportDataFrame['range'] = reportDataFrame['max'] - reportDataFrame['min']
+        
+        reportDataFrame['sd'] = pint_pandas.PintArray(internalDataFrame.std(axis=1,skipna=True).round(2),dtype=f"pint[nanosecond]")
+        reportDataFrame['var'] = pint_pandas.PintArray(internalDataFrame.var(axis=1,skipna=True).round(2),dtype=f"pint[nanosecond]")
+        totalRuntime = reportDataFrame['sum'].sum()
+        reportDataFrame['pct'] = (reportDataFrame['sum'] / totalRuntime) * 100 * self.ureg.pct
+
+
+        if self.uniform_units:
+            for f in timeFields:
+                reportDataFrame[f] = reportDataFrame[f].pint.to(self.timeunit)
+        else:
+            for f in timeFields:
+                reportDataFrame[f] = reportDataFrame[f].pint.to(self._findSmallestPintUnit(reportDataFrame[f].min()))
+
+
+            
+
+
+        # reportDataFrame['pct'] = reportDataFrame['pct'].round(2)
+        # reportDataFrame = reportDataFrame.round(2)
+        # print(reportDataFrame.round(2))
+        # print(reportDataFrame)
+        # print(reportDataFrame.dtypes)
+        reportDataFrame = reportDataFrame.pint.dequantify().round(2)
+        # exit()
+
+
+        return reportDataFrame
+
+
     def report(self, percent_of:str=None, reset:bool=False):
         """Prints a report summarizing all the times recorded by timebudget.
         If percent_of is specified, then times are shown as a percent of that function.
         If `reset` is set, then all stats will be cleared after this report.
         If `uniform_units` is set, then all time values will use the same (smallest) unit value.
         """
-        # print("Adjusting timeunits, please wait...")
-        # for k,v in self.elapsed_total.items():
-        #     print(k)
-        #     print(v)
-        #     self.elapsed_total[k] = [(x * self.ureg.nanosecond) for x in v]
-        #     print(self.elapsed_total[k])
-            # print(v)
-            # self.elapsed_total[k] = 
 
-        results = []
-        for name, timeValues in self.elapsed_total.items():
-            # timeValues = self.elapsed_total[name]
-            total = sum(timeValues) 
-            totalTimed = (total* self.ureg.nanosecond).to(self.timeunit)
-            # print(f"{total=}")
-            cnt = len(timeValues)
-            cycles = cnt * self.ureg.cycle
-            avg = total/cnt
-            avgTimed = totalTimed/cycles
-            minVal = (min(timeValues)* self.ureg.nanosecond).to(self.timeunit)
-            maxVal = (max(timeValues)* self.ureg.nanosecond).to(self.timeunit)
-            diff = maxVal - minVal
-            # have to get the unitless value and reinitialize it, otherwise pint tries to do odd things to the representation
-            sd = (avg**0.5) * self.timeunit
-            # same thing here, subtracting ns - ns/cycle doesn't work out nicely
-            
-            # print(f"{avg=}")
-            var = sum([(x - avg)**2 for x in timeValues])
-            varTimed = (var * self.ureg.nanosecond**2).to(self.timeunit**2)
-            results.append({
-                'name': name,
-                'total': totalTimed,
-                'cnt': cycles,
-                'avg': avgTimed,
-                'min': minVal,
-                'max': maxVal,
-                'diff': diff,
-                'sd':sd,
-                'var':varTimed,
+        results = self._compileResults()
 
-            })
+        # pprint(self.elapsed_total)
+        # exit()
 
-        results = sorted(results, key=lambda r: r['total'], reverse=True)
-        if percent_of:
-            # assert percent_of in self.elapsed_cnt, f"Can't generate report for unrecognized block {percent_of}"
-            self._print(f"timebudget report per {percent_of} cycle...")
-            total_elapsed = sum(self.elapsed_total[percent_of])
-            # total_cnt = self.elapsed_cnt[percent_of]
-            total_cnt = len(self.elapsed_total[percent_of]) * self.ureg.cycle
-            for res in results:
-                formattedDict = self._formatResults(res)
-                formattedDict['avg'] = res['total'] / total_cnt
-                formattedDict['pct'] = 100.0 * res['total'] / total_elapsed
-                formattedDict['avg_cnt'] = f"{res['cnt'] / total_cnt:8.1f~P}"
+
+        # df = pd.DataFrame.from_dict(results)
+        # print(df)
+        # print(df.dtypes)
+        # df_ = df.pint.quantify(level=-1)
+        # pprint(df_)
+        # # df.pint.dequantify()
+
+        print(prettify(results,delay_time=0.1))
+        # exit()
+        
+
+        # if percent_of:
+        #     # assert percent_of in self.elapsed_cnt, f"Can't generate report for unrecognized block {percent_of}"
+        #     self._print(f"timebudget report per {percent_of} cycle...")
+        #     total_elapsed = sum(self.elapsed_total[percent_of])
+        #     # total_cnt = self.elapsed_cnt[percent_of]
+        #     total_cnt = len(self.elapsed_total[percent_of]) * self.ureg.cycle
+        #     for res in results:
+        #         formattedDict = self._formatResults(res)
+        #         formattedDict['avg'] = res['total'] / total_cnt
+        #         formattedDict['pct'] = 100.0 * res['total'] / total_elapsed
+        #         formattedDict['avg_cnt'] = f"{res['cnt'] / total_cnt:8.1f~P}"
 
 
 
 
-                self._print(f"{formattedDict['name']}:{formattedDict['pct']}% avg, sd {formattedDict['sd']}, var {formattedDict['var']}, min {formattedDict['min']}, max {formattedDict['max']}, range {formattedDict['diff']}, {formattedDict['avg_cnt']} calls/cycle, total time:{formattedDict['total']}")
+        #         self._print(f"{formattedDict['name']}:{formattedDict['pct']}% avg, sd {formattedDict['sd']}, var {formattedDict['var']}, min {formattedDict['min']}, max {formattedDict['max']}, range {formattedDict['diff']}, {formattedDict['avg_cnt']} calls/cycle, total time:{formattedDict['total']}")
 
 
-                # if self.uniform_units:
-                #     self._print(f"{res['name']:>25s}:{pct: 6.1f}% avg {avg:8.3f},sd {res['sd']:8.3f}, var {res['var']:8.3f}, range {res['diff']:8.3f} @{avg_cnt:8.3f} calls/cycle ")
-                # else:
-                #     self._print(f"{res['name']:>25s}:{pct: 6.1f~#P}% avg {avg:8.3f~#P},sd {res['sd']:8.3f~#P}, var {res['var']:8.3f~#P}, range {res['diff']:8.3f~#P} @{avg_cnt:8.3f~#P} calls/cycle ")
-        else:
-            self._print("timebudget report...")
-            for res in results:
+        #         # if self.uniform_units:
+        #         #     self._print(f"{res['name']:>25s}:{pct: 6.1f}% avg {avg:8.3f},sd {res['sd']:8.3f}, var {res['var']:8.3f}, range {res['diff']:8.3f} @{avg_cnt:8.3f} calls/cycle ")
+        #         # else:
+        #         #     self._print(f"{res['name']:>25s}:{pct: 6.1f~#P}% avg {avg:8.3f~#P},sd {res['sd']:8.3f~#P}, var {res['var']:8.3f~#P}, range {res['diff']:8.3f~#P} @{avg_cnt:8.3f~#P} calls/cycle ")
+        # else:
+        #     self._print("timebudget report...")
+        #     for res in results:
 
-                # print(res)
-                # diff = res['max'] - res['min']
-                # sd = (res['avg'].m**0.5) * self.ureg.ns
+        #         # print(res)
+        #         # diff = res['max'] - res['min']
+        #         # sd = (res['avg'].m**0.5) * self.ureg.ns
 
-                formattedDict = self._formatResults(res)
-                # print(formattedDict)
+        #         formattedDict = self._formatResults(res)
+        #         # print(formattedDict)
 
-                self._print(f"{formattedDict['name']}:{formattedDict['avg']} avg, sd {formattedDict['sd']}, var {formattedDict['var']}, min {formattedDict['min']}, max {formattedDict['max']}, range {formattedDict['diff']}, {formattedDict['cnt']} calls, total time:{formattedDict['total']}")
+        #         self._print(f"{formattedDict['name']}:{formattedDict['avg']} avg, sd {formattedDict['sd']}, var {formattedDict['var']}, min {formattedDict['min']}, max {formattedDict['max']}, range {formattedDict['diff']}, {formattedDict['cnt']} calls, total time:{formattedDict['total']}")
 
 
-                # if self.uniform_units:
-                #     self._print(f"{res['name']:>25}:{res['avg']:8.3f~P} avg,sd {res['sd']:8.3f~P}, var {res['var']:8.3f~P}, range {res['diff']:8.3f~P} for {res['cnt']: 6d~P} calls")
-                # else:
-                #     self._print(f"{res['name']:>25}:{res['avg']:8.3f~#P} avg,sd {res['sd']:8.3f~#P}, var {res['var']:8.3f~#P}, range {res['diff']:8.3f~#P} for {res['cnt']: 6d} calls")
+        #         # if self.uniform_units:
+        #         #     self._print(f"{res['name']:>25}:{res['avg']:8.3f~P} avg,sd {res['sd']:8.3f~P}, var {res['var']:8.3f~P}, range {res['diff']:8.3f~P} for {res['cnt']: 6d~P} calls")
+        #         # else:
+        #         #     self._print(f"{res['name']:>25}:{res['avg']:8.3f~#P} avg,sd {res['sd']:8.3f~#P}, var {res['var']:8.3f~#P}, range {res['diff']:8.3f~#P} for {res['cnt']: 6d} calls")
         if reset:
             self.reset()
 
