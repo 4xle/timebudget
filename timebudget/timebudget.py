@@ -211,6 +211,7 @@ class TimeBudgetRecorder():
         # print(reportDataFrame.round(2))
         # print(reportDataFrame)
         # print(reportDataFrame.dtypes)
+        reportDataFrame = reportDataFrame.sort_values("pct",ascending=False)
         reportDataFrame = reportDataFrame.pint.dequantify().round(2)
         # exit()
 
