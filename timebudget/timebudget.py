@@ -159,19 +159,18 @@ class TimeBudgetRecorder():
 
 
     def _compileResults(self):
-
-
-        internalData= {k:pd.Series(v,dtype=f"pint[nanosecond]") for k,v in self.elapsed_total.items()}
+        # results are default nanosecond, not typed with pint until the very end to reduce overhead on conversions
+        internalData= {k:pd.Series(v) for k,v in self.elapsed_total.items()}
 
         internalDataFrame = pd.DataFrame(internalData).T
         originalDtypes = internalDataFrame.dtypes
         # print(originalDtypes)
-        internalDataFrame = internalDataFrame.pint.dequantify()
+        # internalDataFrame = internalDataFrame.pint.dequantify()
 
         numberOfRows = len(internalDataFrame.index)
         rangeForDataRows = range(0,numberOfRows)
 
-        timeFields = ["avg","min","max","range","sum","sd","var"]
+        timeFields = ["avg","min","max","range","sum","sd"] # "var"
         counterFields = ["calls"]
         aggregateFields = ["pct"]
         
@@ -183,17 +182,25 @@ class TimeBudgetRecorder():
             reportDataFrame[f] = 0
         # print(reportDataFrame)
         
-        reportDataFrame['calls'] = pint_pandas.PintArray(internalDataFrame.count(axis=1),dtype=self.ureg.cycle)
-        reportDataFrame['sum'] = pint_pandas.PintArray(internalDataFrame.sum(axis=1,skipna=True),dtype=f"pint[nanosecond]")
-        reportDataFrame['avg'] = pint_pandas.PintArray(internalDataFrame.mean(axis=1,skipna=True).round(2),dtype=f"pint[nanosecond]")
+        reportDataFrame['calls'] = internalDataFrame.count(axis=1)
+        reportDataFrame['sum'] = internalDataFrame.sum(axis=1,skipna=True)
+        reportDataFrame['avg'] = internalDataFrame.mean(axis=1,skipna=True).round(2)
         
-        reportDataFrame['min'] = pint_pandas.PintArray(internalDataFrame.min(axis=1,skipna=True),dtype=f"pint[nanosecond]")
-        reportDataFrame['max'] = pint_pandas.PintArray(internalDataFrame.max(axis=1,skipna=True),dtype=f"pint[nanosecond]")
+        reportDataFrame['min'] = internalDataFrame.min(axis=1,skipna=True)
+        reportDataFrame['max'] = internalDataFrame.max(axis=1,skipna=True)
         reportDataFrame['range'] = reportDataFrame['max'] - reportDataFrame['min']
         
-        reportDataFrame['sd'] = pint_pandas.PintArray(internalDataFrame.std(axis=1,skipna=True).round(2),dtype=f"pint[nanosecond]")
-        reportDataFrame['var'] = pint_pandas.PintArray(internalDataFrame.var(axis=1,skipna=True).round(2),dtype=f"pint[nanosecond]")
-        reportDataFrame['pct'] = (reportDataFrame['sum'] / self.totalRunningTime) * 100 * self.ureg.pct
+        reportDataFrame['sd'] = internalDataFrame.std(axis=1,skipna=True).round(2)
+        # reportDataFrame['var'] = pint_pandas.PintArray(internalDataFrame.var(axis=1,skipna=True).round(2),dtype=f"pint[nanosecond]")
+        reportDataFrame['pct'] = reportDataFrame['sum'] / self.totalRunningTime * 100
+        reportDataFrame['pct'] = reportDataFrame['pct'].round(2)
+
+        for f in timeFields:
+            reportDataFrame[f] = pint_pandas.PintArray(reportDataFrame[f], dtype=f"pint[nanosecond]")
+
+        reportDataFrame['calls'] = pint_pandas.PintArray(reportDataFrame['calls'], dtype=f"pint[cycles]")
+
+        reportDataFrame['pct'] = pint_pandas.PintArray(reportDataFrame["pct"], dtype=f"pint[pct]")
 
 
         if self.uniform_units:
