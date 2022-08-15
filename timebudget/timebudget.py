@@ -65,6 +65,8 @@ class TimeBudgetRecorder():
             self.ureg.default_format='~#P'
             pint_pandas.PintType.ureg.default_format = "~#P"
 
+        self.globalStartTime = time.monotonic_ns()
+
 
     def reset(self):
         """Clear all stats collected so far.
@@ -191,8 +193,7 @@ class TimeBudgetRecorder():
         
         reportDataFrame['sd'] = pint_pandas.PintArray(internalDataFrame.std(axis=1,skipna=True).round(2),dtype=f"pint[nanosecond]")
         reportDataFrame['var'] = pint_pandas.PintArray(internalDataFrame.var(axis=1,skipna=True).round(2),dtype=f"pint[nanosecond]")
-        longestRuntime = reportDataFrame['sum'].max()
-        reportDataFrame['pct'] = (reportDataFrame['sum'] / longestRuntime) * 100 * self.ureg.pct
+        reportDataFrame['pct'] = (reportDataFrame['sum'] / self.totalRunningTime) * 100 * self.ureg.pct
 
 
         if self.uniform_units:
@@ -220,6 +221,8 @@ class TimeBudgetRecorder():
 
 
     def report(self, percent_of:str=None, reset:bool=False):
+        self.globalEndTime = time.monotonic_ns()
+        self.totalRunningTime = self.globalEndTime - self.globalStartTime
         """Prints a report summarizing all the times recorded by timebudget.
         If percent_of is specified, then times are shown as a percent of that function.
         If `reset` is set, then all stats will be cleared after this report.
