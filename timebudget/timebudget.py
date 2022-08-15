@@ -40,7 +40,7 @@ class TimeBudgetRecorder():
     This is mostly used through annotation and with-block helpers.
     """
 
-    def __init__(self, quiet_mode:bool=False,units='millisecond',uniform_units=False):
+    def __init__(self, quiet_mode:bool=False,units='microsecond',uniform_units=False):
         self.quiet_mode = quiet_mode
         self.reset()
         self.out_stream = sys.stdout
@@ -99,17 +99,14 @@ class TimeBudgetRecorder():
     #     return value.to_compact()
 
 
-    def _formatResults(self, res, cycles,avg = 0, pct = 0, avg_cnt = 0):
-
-
-
+    def _formatResults(self, res):
         if self.uniform_units:
             formattedDict = {
                 'name': f"{res['name']:>25s}",
                 'total': f"{res['total']:8.3f~}",
-                'cnt': cycles,
-                'pct':f"{pct: 6.1f}",
-                'avg_cnt':f"{avg_cnt:8.3f}",
+                'cnt': f"{res['cnt']}",
+                # 'pct':f"{pct: 6.1f}",
+                # 'avg_cnt':f"{avg_cnt:8.3f}",
                 'avg': f"{res['avg']:8.3f~}",
                 'min': f"{res['min']:8.3f~}",
                 'max': f"{res['max']:8.3f~}",
@@ -121,9 +118,9 @@ class TimeBudgetRecorder():
             formattedDict = {
                 'name': f"{res['name']:>25s}",
                 'total': f"{res['total']:8.3f~#P}",
-                'cnt': cycles,
-                'pct':f"{pct: 6.1f}",
-                'avg_cnt':f"{avg_cnt:8.3f}",
+                'cnt': f"{res['cnt']}",
+                # 'pct':f"{pct: 6.1f}",
+                # 'avg_cnt':f"{avg_cnt:8.3f}",
                 'avg': f"{res['avg']:8.3f~#P}",
                 'min': f"{res['min']:8.3f~#P}",
                 'max': f"{res['max']:8.3f~#P}",
@@ -179,9 +176,10 @@ class TimeBudgetRecorder():
                 'max': maxVal,
                 'diff': diff,
                 'sd':sd,
-                'var':varTimed
+                'var':varTimed,
 
             })
+
         results = sorted(results, key=lambda r: r['total'], reverse=True)
         if percent_of:
             # assert percent_of in self.elapsed_cnt, f"Can't generate report for unrecognized block {percent_of}"
@@ -190,12 +188,13 @@ class TimeBudgetRecorder():
             # total_cnt = self.elapsed_cnt[percent_of]
             total_cnt = len(self.elapsed_total[percent_of]) * self.ureg.cycle
             for res in results:
-                avg = res['total'] / total_cnt
-                pct = 100.0 * res['total'] / total_elapsed
-                avg_cnt = res['cnt'] / total_cnt
+                formattedDict = self._formatResults(res)
+                formattedDict['avg'] = res['total'] / total_cnt
+                formattedDict['pct'] = 100.0 * res['total'] / total_elapsed
+                formattedDict['avg_cnt'] = f"{res['cnt'] / total_cnt:8.1f~P}"
 
 
-                formattedDict = self._formatResults(res, cycle, avg,pct,avg_cnt)
+
 
                 self._print(f"{formattedDict['name']}:{formattedDict['pct']}% avg, sd {formattedDict['sd']}, var {formattedDict['var']}, min {formattedDict['min']}, max {formattedDict['max']}, range {formattedDict['diff']}, {formattedDict['avg_cnt']} calls/cycle, total time:{formattedDict['total']}")
 
@@ -212,9 +211,10 @@ class TimeBudgetRecorder():
                 # diff = res['max'] - res['min']
                 # sd = (res['avg'].m**0.5) * self.ureg.ns
 
-                formattedDict = self._formatResults(res,cycles)
+                formattedDict = self._formatResults(res)
+                # print(formattedDict)
 
-                self._print(f"{formattedDict['name']}:{formattedDict['avg']} avg, sd {formattedDict['sd']}, var {formattedDict['var']}, min {formattedDict['min']}, max {formattedDict['max']}, range {formattedDict['diff']}, {formattedDict['avg_cnt']} calls/cycle, total time:{formattedDict['total']}")
+                self._print(f"{formattedDict['name']}:{formattedDict['avg']} avg, sd {formattedDict['sd']}, var {formattedDict['var']}, min {formattedDict['min']}, max {formattedDict['max']}, range {formattedDict['diff']}, {formattedDict['cnt']} calls, total time:{formattedDict['total']}")
 
 
                 # if self.uniform_units:
