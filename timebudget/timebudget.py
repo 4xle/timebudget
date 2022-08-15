@@ -193,7 +193,7 @@ class TimeBudgetRecorder():
 
                 formattedDict = self._formatResults(res, avg, pct, avg_cnt,cycles)
 
-                self._print(f"{formattedDict['name']}:{formattedDict['pct']}% avg, sd {formattedDict['sd']}, var {formattedDict['var']}, min {formattedDict['min']}, max {formattedDict['max']}, range {formattedDict['diff']} calls/cycle, total time:{formattedDict['total']}")
+                self._print(f"{formattedDict['name']}:{formattedDict['pct']}% avg, sd {formattedDict['sd']}, var {formattedDict['var']}, min {formattedDict['min']}, max {formattedDict['max']}, range {formattedDict['diff']}, {formattedDict['avg_cnt']} calls/cycle, total time:{formattedDict['total']}")
 
 
                 # if self.uniform_units:
@@ -210,7 +210,7 @@ class TimeBudgetRecorder():
 
                 formattedDict = self._formatResults(res,cycles)
 
-                self._print(f"{formattedDict['name']}:{formattedDict['avg']} avg, sd {formattedDict['sd']}, var {formattedDict['var']}, min {formattedDict['min']}, max {formattedDict['max']}, range {formattedDict['diff']} calls/cycle, total time:{formattedDict['total']}")
+                self._print(f"{formattedDict['name']}:{formattedDict['avg']} avg, sd {formattedDict['sd']}, var {formattedDict['var']}, min {formattedDict['min']}, max {formattedDict['max']}, range {formattedDict['diff']}, {formattedDict['avg_cnt']} calls/cycle, total time:{formattedDict['total']}")
 
 
                 # if self.uniform_units:
