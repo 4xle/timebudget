@@ -183,7 +183,7 @@ class TimeBudgetRecorder():
         
         reportDataFrame['calls'] = pint_pandas.PintArray(internalDataFrame.count(axis=1),dtype=self.ureg.cycle)
         reportDataFrame['sum'] = pint_pandas.PintArray(internalDataFrame.sum(axis=1,skipna=True),dtype=f"pint[nanosecond]")
-        reportDataFrame['avg'] = pint_pandas.PintArray(internalDataFrame.mean(axis=1,skipna=True).round(2),dtype=f"pint[nanosecond / {self.ureg.cycle}]")
+        reportDataFrame['avg'] = pint_pandas.PintArray(internalDataFrame.mean(axis=1,skipna=True).round(2),dtype=f"pint[nanosecond]")
         
         reportDataFrame['min'] = pint_pandas.PintArray(internalDataFrame.min(axis=1,skipna=True),dtype=f"pint[nanosecond]")
         reportDataFrame['max'] = pint_pandas.PintArray(internalDataFrame.max(axis=1,skipna=True),dtype=f"pint[nanosecond]")
