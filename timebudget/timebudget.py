@@ -103,16 +103,16 @@ class TimeBudgetRecorder():
         if self.uniform_units:
             formattedDict = {
                 'name': f"{res['name']:>25s}",
-                'total': f"{res['total']:8.3f}",
+                'total': f"{res['total']:8.3f~}",
                 'cnt': cycles,
                 'pct':f"{pct: 6.1f}",
                 'avg_cnt':f"{avg_cnt:8.3f}",
-                'avg': f"{res['avg']:8.3f}",
-                'min': f"{res['min']:8.3f}",
-                'max': f"{res['max']:8.3f}",
-                'diff': f"{res['diff']:8.3f}",
-                'sd':f"{res['sd']:8.3f}",
-                'var':f"{res['var']:8.3f}"
+                'avg': f"{res['avg']:8.3f~}",
+                'min': f"{res['min']:8.3f~}",
+                'max': f"{res['max']:8.3f~}",
+                'diff': f"{res['diff']:8.3f~}",
+                'sd':f"{res['sd']:8.3f~}",
+                'var':f"{res['var']:8.3f~P}"
             }
         else:
             formattedDict = {
