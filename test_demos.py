@@ -14,3 +14,9 @@ def test_demo3():
 
 def test_demo4():
     import demo4
+
+def test_demo5():
+    import demo5
+
+def test_demo6():
+    import demo6

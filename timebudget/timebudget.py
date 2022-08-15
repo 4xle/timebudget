@@ -40,13 +40,14 @@ class TimeBudgetRecorder():
     This is mostly used through annotation and with-block helpers.
     """
 
-    def __init__(self, quiet_mode:bool=False,units='millisecond'):
+    def __init__(self, quiet_mode:bool=False,units='millisecond',uniform_units=False):
         self.quiet_mode = quiet_mode
         self.reset()
         self.out_stream = sys.stdout
         self.ureg = UnitRegistry()
         self.ureg.define('cycle = 1 * turn = cyc')
         self.timeunit = self.ureg[units]
+        self.uniform_units = uniform_units
 
     def reset(self):
         """Clear all stats collected so far.
@@ -96,6 +97,38 @@ class TimeBudgetRecorder():
     #     assert ns_duration >= 0
     #     value = ns_duration * self.ureg.nanosecond
     #     return value.to_compact()
+
+
+    def _formatResults(self, res, cycles,avg = 0, pct = 0, avg_cnt = 0):
+        if self.uniform_units:
+            formattedDict = {
+                'name': f"{res['name']:>25s}",
+                'total': f"{res['total']:8.3f}",
+                'cnt': cycles,
+                'pct':f"{pct: 6.1f}",
+                'avg_cnt':f"{avg_cnt:8.3f}",
+                'avg': f"{res['avg']:8.3f}",
+                'min': f"{res['min']:8.3f}",
+                'max': f"{res['max']:8.3f}",
+                'diff': f"{res['diff']:8.3f}",
+                'sd':f"{res['sd']:8.3f}",
+                'var':f"{res['var']:8.3f}"
+            }
+        else:
+            formattedDict = {
+                'name': f"{res['name']:>25s}",
+                'total': f"{res['total']:8.3f~#P}",
+                'cnt': cycles,
+                'pct':f"{pct: 6.1f}",
+                'avg_cnt':f"{avg_cnt:8.3f}",
+                'avg': f"{res['avg']:8.3f~#P}",
+                'min': f"{res['min']:8.3f~#P}",
+                'max': f"{res['max']:8.3f~#P}",
+                'diff': f"{res['diff']:8.3f~#P}",
+                'sd':f"{res['sd']:8.3f~#P}",
+                'var':f"{res['var']:8.3f~#P}"
+            }
+        return formattedDict
 
 
     def report(self, percent_of:str=None, reset:bool=False):
@@ -156,22 +189,34 @@ class TimeBudgetRecorder():
                 avg = res['total'] / total_cnt
                 pct = 100.0 * res['total'] / total_elapsed
                 avg_cnt = res['cnt'] / total_cnt
-                if self.uniform_units:
-                    self._print(f"{res['name']:>25s}:{pct: 6.1f}% avg {avg:8.3f},sd {res['sd']:8.3f}, var {res['var']:8.3f}, range {res['diff']:8.3f} @{avg_cnt:8.3f} calls/cycle ")
-                else:
-                    self._print(f"{res['name']:>25s}:{pct: 6.1f~#P}% avg {avg:8.3f~#P},sd {res['sd']:8.3f~#P}, var {res['var']:8.3f~#P}, range {res['diff']:8.3f~#P} @{avg_cnt:8.3f~#P} calls/cycle ")
+
+
+                formattedDict = self._formatResults(res, avg, pct, avg_cnt,cycles)
+
+                self._print(f"{formattedDict['name']}:{formattedDict['pct']}% avg, sd {formattedDict['sd']}, var {formattedDict['var']}, min {formattedDict['min']}, max {formattedDict['max']}, range {formattedDict['diff']} calls/cycle, total time:{formattedDict['total']}")
+
+
+                # if self.uniform_units:
+                #     self._print(f"{res['name']:>25s}:{pct: 6.1f}% avg {avg:8.3f},sd {res['sd']:8.3f}, var {res['var']:8.3f}, range {res['diff']:8.3f} @{avg_cnt:8.3f} calls/cycle ")
+                # else:
+                #     self._print(f"{res['name']:>25s}:{pct: 6.1f~#P}% avg {avg:8.3f~#P},sd {res['sd']:8.3f~#P}, var {res['var']:8.3f~#P}, range {res['diff']:8.3f~#P} @{avg_cnt:8.3f~#P} calls/cycle ")
         else:
             self._print("timebudget report...")
             for res in results:
+
                 # print(res)
                 # diff = res['max'] - res['min']
                 # sd = (res['avg'].m**0.5) * self.ureg.ns
 
+                formattedDict = self._formatResults(res,cycles)
 
-                if self.uniform_units:
-                    self._print(f"{res['name']:>25}:{res['avg']:8.3f~P} avg,sd {res['sd']:8.3f~P}, var {res['var']:8.3f~P}, range {res['diff']:8.3f~P} for {res['cnt']: 6d~P} calls")
-                else:
-                    self._print(f"{res['name']:>25}:{res['avg']:8.3f~#P} avg,sd {res['sd']:8.3f~#P}, var {res['var']:8.3f~#P}, range {res['diff']:8.3f~#P} for {res['cnt']: 6d} calls")
+                self._print(f"{formattedDict['name']}:{formattedDict['avg']} avg, sd {formattedDict['sd']}, var {formattedDict['var']}, min {formattedDict['min']}, max {formattedDict['max']}, range {formattedDict['diff']} calls/cycle, total time:{formattedDict['total']}")
+
+
+                # if self.uniform_units:
+                #     self._print(f"{res['name']:>25}:{res['avg']:8.3f~P} avg,sd {res['sd']:8.3f~P}, var {res['var']:8.3f~P}, range {res['diff']:8.3f~P} for {res['cnt']: 6d~P} calls")
+                # else:
+                #     self._print(f"{res['name']:>25}:{res['avg']:8.3f~#P} avg,sd {res['sd']:8.3f~#P}, var {res['var']:8.3f~#P}, range {res['diff']:8.3f~#P} for {res['cnt']: 6d} calls")
         if reset:
             self.reset()
 
