@@ -191,8 +191,8 @@ class TimeBudgetRecorder():
         
         reportDataFrame['sd'] = pint_pandas.PintArray(internalDataFrame.std(axis=1,skipna=True).round(2),dtype=f"pint[nanosecond]")
         reportDataFrame['var'] = pint_pandas.PintArray(internalDataFrame.var(axis=1,skipna=True).round(2),dtype=f"pint[nanosecond]")
-        totalRuntime = reportDataFrame['sum'].sum()
-        reportDataFrame['pct'] = (reportDataFrame['sum'] / totalRuntime) * 100 * self.ureg.pct
+        longestRuntime = reportDataFrame['sum'].max()
+        reportDataFrame['pct'] = (reportDataFrame['sum'] / longestRuntime) * 100 * self.ureg.pct
 
 
         if self.uniform_units:
