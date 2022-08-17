@@ -244,61 +244,9 @@ class TimeBudgetRecorder():
 
         results = self._compileResults()
 
-        # pprint(self.elapsed_total)
-        # exit()
-
-
-        # df = pd.DataFrame.from_dict(results)
-        # print(df)
-        # print(df.dtypes)
-        # df_ = df.pint.quantify(level=-1)
-        # pprint(df_)
-        # # df.pint.dequantify()
-
         print(prettify(results,delay_time=0.1,row_limit=len(self.elapsed_total.keys())))
         # exit()
         
-
-        # if percent_of:
-        #     # assert percent_of in self.elapsed_cnt, f"Can't generate report for unrecognized block {percent_of}"
-        #     self._print(f"timebudget report per {percent_of} cycle...")
-        #     total_elapsed = sum(self.elapsed_total[percent_of])
-        #     # total_cnt = self.elapsed_cnt[percent_of]
-        #     total_cnt = len(self.elapsed_total[percent_of]) * self.ureg.cycle
-        #     for res in results:
-        #         formattedDict = self._formatResults(res)
-        #         formattedDict['avg'] = res['total'] / total_cnt
-        #         formattedDict['pct'] = 100.0 * res['total'] / total_elapsed
-        #         formattedDict['avg_cnt'] = f"{res['cnt'] / total_cnt:8.1f~P}"
-
-
-
-
-        #         self._print(f"{formattedDict['name']}:{formattedDict['pct']}% avg, sd {formattedDict['sd']}, var {formattedDict['var']}, min {formattedDict['min']}, max {formattedDict['max']}, range {formattedDict['diff']}, {formattedDict['avg_cnt']} calls/cycle, total time:{formattedDict['total']}")
-
-
-        #         # if self.uniform_units:
-        #         #     self._print(f"{res['name']:>25s}:{pct: 6.1f}% avg {avg:8.3f},sd {res['sd']:8.3f}, var {res['var']:8.3f}, range {res['diff']:8.3f} @{avg_cnt:8.3f} calls/cycle ")
-        #         # else:
-        #         #     self._print(f"{res['name']:>25s}:{pct: 6.1f~#P}% avg {avg:8.3f~#P},sd {res['sd']:8.3f~#P}, var {res['var']:8.3f~#P}, range {res['diff']:8.3f~#P} @{avg_cnt:8.3f~#P} calls/cycle ")
-        # else:
-        #     self._print("timebudget report...")
-        #     for res in results:
-
-        #         # print(res)
-        #         # diff = res['max'] - res['min']
-        #         # sd = (res['avg'].m**0.5) * self.ureg.ns
-
-        #         formattedDict = self._formatResults(res)
-        #         # print(formattedDict)
-
-        #         self._print(f"{formattedDict['name']}:{formattedDict['avg']} avg, sd {formattedDict['sd']}, var {formattedDict['var']}, min {formattedDict['min']}, max {formattedDict['max']}, range {formattedDict['diff']}, {formattedDict['cnt']} calls, total time:{formattedDict['total']}")
-
-
-        #         # if self.uniform_units:
-        #         #     self._print(f"{res['name']:>25}:{res['avg']:8.3f~P} avg,sd {res['sd']:8.3f~P}, var {res['var']:8.3f~P}, range {res['diff']:8.3f~P} for {res['cnt']: 6d~P} calls")
-        #         # else:
-        #         #     self._print(f"{res['name']:>25}:{res['avg']:8.3f~#P} avg,sd {res['sd']:8.3f~#P}, var {res['var']:8.3f~#P}, range {res['diff']:8.3f~#P} for {res['cnt']: 6d} calls")
         if reset:
             self.reset()
 
@@ -353,9 +301,10 @@ def set_quiet(quiet:bool=True):
     """
     _default_recorder.quiet_mode = quiet
 
-def set_units(units='millisecond',uniform_units=True):
+def set_units(units='millisecond',uniform_units=True,sortbyKey=""):
     _default_recorder.timeunit = _default_recorder.ureg[units]
     _default_recorder.uniform_units = uniform_units
+    _default_recorder.sortbyKey = sortbyKey
 
 
 # Create shortcuts for export
