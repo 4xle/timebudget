@@ -171,8 +171,8 @@ class TimeBudgetRecorder():
         numberOfRows = len(internalDataFrame.index)
         rangeForDataRows = range(0,numberOfRows)
 
-        timeFields = ["avg","min","max","range","sum","sd"] # "var"
-        counterFields = ["calls"]
+        timeFields = ["avg","min","max","range","sum","sd1","sd2","sd1max","sd2max"] # "var"
+        counterFields = ["cov1","calls"]
         aggregateFields = ["pct"]
         
         reportDataFrame = pd.DataFrame(index=[k for k in self.elapsed_total])
@@ -216,14 +216,6 @@ class TimeBudgetRecorder():
                 reportDataFrame[f] = reportDataFrame[f].pint.to(self._findSmallestPintUnit(reportDataFrame[f].min()))
 
 
-            
-
-
-        # reportDataFrame['pct'] = reportDataFrame['pct'].round(2)
-        # reportDataFrame = reportDataFrame.round(2)
-        # print(reportDataFrame.round(2))
-        # print(reportDataFrame)
-        # print(reportDataFrame.dtypes)
         if len(self.sortbyKey) == 0:
             reportDataFrame = reportDataFrame.sort_values("pct",ascending=False)
         else:
