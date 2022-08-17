@@ -248,7 +248,7 @@ class TimeBudgetRecorder():
 
         results = self._compileResults()
 
-        print(prettify(results,delay_time=0.1,row_limit=len(self.elapsed_total.keys())))
+        print(prettify(results,delay_time=0.1,row_limit=len(self.elapsed_total.keys())),col_limit=len(reportDataFrame.columns))
         # exit()
         
         if reset:
