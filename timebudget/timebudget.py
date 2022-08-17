@@ -194,8 +194,11 @@ class TimeBudgetRecorder():
         reportDataFrame['sd1'] = internalDataFrame.std(axis=1,skipna=True).round(2)
         reportDataFrame['sd2'] = internalDataFrame.std(axis=1,skipna=True).round(2)*2
         reportDataFrame['sd1max'] = reportDataFrame['avg'] + reportDataFrame['sd1']
+        reportDataFrame['sd1max'] = reportDataFrame['sd1max'].round(2)
         reportDataFrame['sd2max'] = reportDataFrame['avg'] + reportDataFrame['sd2']
+        reportDataFrame['sd2max'] = reportDataFrame['sd2max'].round(2)
         reportDataFrame['cov1'] = reportDataFrame['sd1'] / reportDataFrame['avg']
+        reportDataFrame['cov1'] = reportDataFrame['cov1'].round(2)
         # reportDataFrame['var'] = pint_pandas.PintArray(internalDataFrame.var(axis=1,skipna=True).round(2),dtype=f"pint[nanosecond]")
         reportDataFrame['pct'] = reportDataFrame['sum'] / self.totalRunningTime * 100
         reportDataFrame['pct'] = reportDataFrame['pct'].round(2)
