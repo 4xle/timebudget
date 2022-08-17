@@ -46,7 +46,7 @@ class TimeBudgetRecorder():
     This is mostly used through annotation and with-block helpers.
     """
 
-    def __init__(self, quiet_mode:bool=False,units='microsecond',uniform_units=False):
+    def __init__(self, quiet_mode:bool=False,units='microsecond',uniform_units=False,sortbyKey=""):
         self.quiet_mode = quiet_mode
         self.reset()
         self.out_stream = sys.stdout
@@ -58,6 +58,7 @@ class TimeBudgetRecorder():
         self.ureg.define('ppm = 1e-6 fraction')
         self.timeunit = self.ureg[units]
         self.uniform_units = uniform_units
+        self.sortbyKey=sortbyKey
         if self.uniform_units:
             self.ureg.default_format='~'
             pint_pandas.PintType.ureg.default_format = "~"
@@ -219,8 +220,13 @@ class TimeBudgetRecorder():
         # print(reportDataFrame.round(2))
         # print(reportDataFrame)
         # print(reportDataFrame.dtypes)
-        reportDataFrame = reportDataFrame.sort_values("pct",ascending=False)
-        reportDataFrame = reportDataFrame.pint.dequantify().round(2)
+        if len(self.sortbyKey) == 0:
+            reportDataFrame = reportDataFrame.sort_values("pct",ascending=False)
+        else:
+            reportDataFrame = reportDataFrame.sort_values(self.sortbyKey,ascending=False)
+
+        if self.uniform_units is False:
+            reportDataFrame = reportDataFrame.pint.dequantify().round(2)
         # exit()
 
 
