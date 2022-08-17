@@ -249,7 +249,7 @@ class TimeBudgetRecorder():
         # pprint(df_)
         # # df.pint.dequantify()
 
-        print(prettify(results,delay_time=0.1))
+        print(prettify(results,delay_time=0.1,row_limit=len(self.elapsed_total.keys())))
         # exit()
         
 
