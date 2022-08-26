@@ -27,6 +27,8 @@ from typing import Callable, Optional, Union
 import warnings
 import pint
 import pandas as pd
+from shutil import get_terminal_size
+pd.set_option('display.width', get_terminal_size()[0])
 from numpy import nan,ptp
 import pint_pandas
 pint_pandas.PintType.ureg.default_format = "~P"
