@@ -16,7 +16,9 @@ def test_demo4():
     import demo4
 
 def test_demo5():
+    print("testing uniform units=False")
     import demo5
 
 def test_demo6():
+    print("testing uniform units=True")
     import demo6

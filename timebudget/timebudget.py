@@ -24,12 +24,14 @@ from functools import wraps
 import sys
 import time
 from typing import Callable, Optional, Union
+import tabulate
 import warnings
 import pint
 import pandas as pd
-from shutil import get_terminal_size
-pd.set_option('display.width', get_terminal_size()[0])
-from numpy import nan,ptp
+# from shutil import get_terminal_size
+# pd.set_option('display.width', get_terminal_size()[0])
+# from numpy import nan,ptp
+import numpy as np
 import pint_pandas
 pint_pandas.PintType.ureg.default_format = "~P"
 from rich_dataframe import prettify
@@ -165,7 +167,11 @@ class TimeBudgetRecorder():
         # results are default nanosecond, not typed with pint until the very end to reduce overhead on conversions
         internalData= {k:pd.Series(v) for k,v in self.elapsed_total.items()}
 
-        internalDataFrame = pd.DataFrame(internalData).T
+        internalDataFrame = pd.DataFrame(internalData)
+
+        print(tabulate.tabulate(internalDataFrame, tablefmt="github", headers="keys", showindex="always"))
+        # exit()
+        # print(internalDataFrame.sum(skipna=True))
         originalDtypes = internalDataFrame.dtypes
         # print(originalDtypes)
         # internalDataFrame = internalDataFrame.pint.dequantify()
@@ -173,62 +179,160 @@ class TimeBudgetRecorder():
         numberOfRows = len(internalDataFrame.index)
         rangeForDataRows = range(0,numberOfRows)
 
-        timeFields = ["avg","min","max","range","sum","sd1","sd2","sd1max","sd2max"] # "var"
-        counterFields = ["cov1","calls"]
-        aggregateFields = ["pct"]
+        fieldUnitMapping = {
+            "calls":"dimensionless",
+            "pct":"dimensionless",
+            "avg":"nanosecond/cycle",
+            "sum":"nanosecond",
+            "min":"nanosecond",
+            "max":"nanosecond",
+            "range":"nanosecond",
+            "sd1":"nanosecond",
+            "sd2":"nanosecond",
+            "cov1":"dimensionless",
+        }
+
+        conversionUnitMapping = {
+        "calls":"dimensionless",
+            "pct":"dimensionless",
+            "avg":f"{self.timeunit}/cycle",
+            "sum":f"{self.timeunit}",
+            "min":f"{self.timeunit}",
+            "max":f"{self.timeunit}",
+            "range":f"{self.timeunit}",
+            "sd1":f"{self.timeunit}",
+            "sd2":f"{self.timeunit}",
+            "cov1":"dimensionless"
+        }
+
+        def getDomainRange(data):
+            return data.max() - data.min()
+
+
+        def computePct(data):
+            return data.sum() / self.totalRunningTime * 100
+
+        def computeStd1(data):
+            return data.std(skipna=True)
+
+        def computeStd2(data):
+            return data.std(skipna=True)*2
+
+        def computeCov1(data):
+            return data.std(skipna=True) / data.mean(skipna=True) 
+
+
+        operationMapping = {
+            "calls":pd.DataFrame.count,
+            "pct":computePct,
+            "avg":pd.DataFrame.mean,
+            "sum":pd.DataFrame.sum,
+            "min":pd.DataFrame.min,
+            "max":pd.DataFrame.max,
+            "range":getDomainRange,
+            "sd1":computeStd1,
+            "sd2":computeStd2,
+            "cov1":computeCov1,
+            # "pct":,
+            # "sd1max":"nanosecond",
+            # "sd2max":"nanosecond",
+        }
+
+        # counterFields1 = ["calls"]
+        # timeFields = ["avg","sum","min","max","range","sd1","sd2","sd1max","sd2max"] # "var"
+        # counterFields2 = ["cov1"]
+        # aggregateFields = ["pct"]
         
+        rawDataFrame = pd.DataFrame(index=[k for k in self.elapsed_total])
         reportDataFrame = pd.DataFrame(index=[k for k in self.elapsed_total])
 
         # add the fields first in the desired order so that logical ops afterwards can be organized without impacting the table order
-        fieldsToAdd = timeFields + counterFields + aggregateFields
-        for f in fieldsToAdd:
-            reportDataFrame[f] = 0
+        # fieldsToAdd = counterFields1 + aggregateFields + timeFields + counterFields2
+        for f in fieldUnitMapping:
+            # rawDataFrame[f] = pint_pandas.PintArray(internalDataFrame.assign(f=lambda x: operationMapping[f](x)),dtype=f"pint[{fieldUnitMapping[f]}]")
+            rawDataFrame[f] = pint_pandas.PintArray(np.around(operationMapping[f](internalDataFrame),2),dtype=f"pint[{fieldUnitMapping[f]}]")
+
+
+            # print(rawDataFrame)
+
+            if fieldUnitMapping[f] != "dimensionless":
+                rawDataFrame[f] = rawDataFrame[f].pint.to(conversionUnitMapping[f])
+                rawDataFrame[f] = pint_pandas.PintArray(np.around(rawDataFrame[f].values.quantity.m,2),dtype=f"pint[{conversionUnitMapping[f]}]")
+
+        # print(rawDataFrame.dtypes)
+
+        # rawDataFrame_ = rawDataFrame.pint.dequantify()
+
+        # for f in fieldUnitMapping:
+        #     if f == "dimensionless":
+        #         continue
+        #     # rawDataFrame[f] = np.around(rawDataFrame[f],2)
+        #     print(rawDataFrame[f])
+        #     for c in rawDataFrame.columns:
+        #         if f in c:
+        #             reportDataFrame[f] = pint_pandas.PintArray(np.around(rawDataFrame[f].values.quantity.m,2),dtype=f"pint[{conversionUnitMapping[f]}]")
+        #             # print(reportDataFrame[f])
+
+
         # print(reportDataFrame)
+
         
-        reportDataFrame['calls'] = internalDataFrame.count(axis=1)
-        reportDataFrame['sum'] = internalDataFrame.sum(axis=1,skipna=True)
-        reportDataFrame['avg'] = internalDataFrame.mean(axis=1,skipna=True).round(2)
+        # reportDataFrame['calls'] = internalDataFrame.count()
+        # print(reportDataFrame['calls'])
+        # reportDataFrame['sum'] = internalDataFrame.sum(skipna=True)
+        # print(reportDataFrame['sum'])
+        # reportDataFrame['avg'] = internalDataFrame.mean(skipna=True)
         
-        reportDataFrame['min'] = internalDataFrame.min(axis=1,skipna=True)
-        reportDataFrame['max'] = internalDataFrame.max(axis=1,skipna=True)
-        reportDataFrame['range'] = reportDataFrame['max'] - reportDataFrame['min']
+        # reportDataFrame['min'] = internalDataFrame.min(skipna=True)
+        # reportDataFrame['max'] = internalDataFrame.max(skipna=True)
+        # reportDataFrame['range'] = reportDataFrame['max'] - reportDataFrame['min']
         
-        reportDataFrame['sd1'] = internalDataFrame.std(axis=1,skipna=True).round(2)
-        reportDataFrame['sd2'] = internalDataFrame.std(axis=1,skipna=True).round(2)*2
-        reportDataFrame['sd1max'] = reportDataFrame['avg'] + reportDataFrame['sd1']
-        reportDataFrame['sd1max'] = reportDataFrame['sd1max'].round(2)
-        reportDataFrame['sd2max'] = reportDataFrame['avg'] + reportDataFrame['sd2']
-        reportDataFrame['sd2max'] = reportDataFrame['sd2max'].round(2)
-        reportDataFrame['cov1'] = reportDataFrame['sd1'] / reportDataFrame['avg']
-        reportDataFrame['cov1'] = reportDataFrame['cov1'].round(2)
-        # reportDataFrame['var'] = pint_pandas.PintArray(internalDataFrame.var(axis=1,skipna=True).round(2),dtype=f"pint[nanosecond]")
-        reportDataFrame['pct'] = reportDataFrame['sum'] / self.totalRunningTime * 100
-        reportDataFrame['pct'] = reportDataFrame['pct'].round(2)
+        # reportDataFrame['sd1'] = internalDataFrame.std(skipna=True)
+        # reportDataFrame['sd2'] = internalDataFrame.std(skipna=True)*2
+        # reportDataFrame['sd1max'] = reportDataFrame['avg'] + reportDataFrame['sd1']
+        # reportDataFrame['sd1max'] = reportDataFrame['sd1max']
+        # reportDataFrame['sd2max'] = reportDataFrame['avg'] + reportDataFrame['sd2']
+        # reportDataFrame['sd2max'] = reportDataFrame['sd2max']
+        # reportDataFrame['cov1'] = reportDataFrame['sd1'] / reportDataFrame['avg']
+        # reportDataFrame['cov1'] = reportDataFrame['cov1']
+        # # reportDataFrame['var'] = pint_pandas.PintArray(internalDataFrame.var(axis=1,skipna=True),dtype=f"pint[nanosecond]")
+        # reportDataFrame['pct'] = reportDataFrame['sum'] / self.totalRunningTime * 100
+        # reportDataFrame['pct'] = reportDataFrame['pct']
 
-        for f in timeFields:
-            reportDataFrame[f] = pint_pandas.PintArray(reportDataFrame[f], dtype=f"pint[nanosecond]")
+        # reportDataFrame['calls'] = pint_pandas.PintArray(reportDataFrame['calls'], dtype=f"pint[cycles]")
 
-        reportDataFrame['calls'] = pint_pandas.PintArray(reportDataFrame['calls'], dtype=f"pint[cycles]")
-
-        reportDataFrame['pct'] = pint_pandas.PintArray(reportDataFrame["pct"], dtype=f"pint[pct]")
+        # reportDataFrame['pct'] = pint_pandas.PintArray(reportDataFrame["pct"], dtype=f"pint[pct]")
 
 
-        if self.uniform_units:
-            for f in timeFields:
-                reportDataFrame[f] = reportDataFrame[f].pint.to(self.timeunit)
-        else:
-            for f in timeFields:
-                reportDataFrame[f] = reportDataFrame[f].pint.to(self._findSmallestPintUnit(reportDataFrame[f].min()))
+        # for f in timeFields:
+        #     reportDataFrame[f] = pint_pandas.PintArray(reportDataFrame[f].round(2), dtype=f"pint[nanosecond]")
+        #     reportDataFrame[f] = reportDataFrame[f].pint.to(self.timeunit)
+
+        # reportDataFrame = reportDataFrame.T.assign(Totals= lambda x:x.sum(axis=1)).T
+
+        print(rawDataFrame.dtypes)
+        print(rawDataFrame)
+
+        # reportDataFrame = reportDataFrame.pint.dequantify()
 
 
-        if len(self.sortbyKey) == 0:
-            reportDataFrame = reportDataFrame.sort_values("pct",ascending=False)
-        else:
-            reportDataFrame = reportDataFrame.sort_values(self.sortbyKey,ascending=False)
+        # if not self.uniform_units:
+        # #     for f in timeFields:
+        # #         reportDataFrame[f] = reportDataFrame[f].pint.to(self.timeunit)
+        # # else:
+        #     for f in timeFields:
+        #         reportDataFrame[f] = reportDataFrame[f].pint.to(self._findSmallestPintUnit(reportDataFrame[f].min()))
+        #         reportDataFrame[f] = reportDataFrame[f].pint.dequantify()
 
-        if self.uniform_units is False:
-            reportDataFrame = reportDataFrame.pint.dequantify().round(2)
-        # exit()
+
+        # if len(self.sortbyKey) == 0:
+        #     reportDataFrame = reportDataFrame.sort_values("pct",ascending=False)
+        # else:
+        #     reportDataFrame = reportDataFrame.sort_values(self.sortbyKey,ascending=False)
+
+        # # if self.uniform_units is False:
+        # reportDataFrame = reportDataFrame.pint.dequantify().round(2)
+        # # exit()
 
 
         return reportDataFrame
@@ -245,7 +349,8 @@ class TimeBudgetRecorder():
 
         results = self._compileResults()
 
-        print(prettify(results,delay_time=0.1,row_limit=len(self.elapsed_total.keys()),col_limit=len(results.columns)))
+        # print(prettify(results,delay_time=0.1,row_limit=len(self.elapsed_total.keys()),col_limit=len(results.columns)))
+        print(tabulate.tabulate(results, tablefmt="github", headers="keys", showindex="always"))
         # exit()
         
         if reset:
