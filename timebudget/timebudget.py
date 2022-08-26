@@ -302,6 +302,7 @@ class TimeBudgetRecorder():
 
         # print(prettify(results,delay_time=0.1,row_limit=len(self.elapsed_total.keys()),col_limit=len(results.columns)))
         print(tabulate.tabulate(results, tablefmt="github", headers="keys", showindex="always"))
+        print(f"Total logged time:{sum(results['sum'])}")
         # exit()
         
         if reset:
