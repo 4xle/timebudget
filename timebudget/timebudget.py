@@ -20,7 +20,7 @@ timebudget.report()  # prints a summary of all annotated functions
 """
 import atexit
 from collections import defaultdict,Counter
-from functools import wraps
+from functools import wraps, partial
 import sys
 import time
 from typing import Callable, Optional, Union,List
@@ -30,7 +30,7 @@ import warnings
 import pint
 import pandas as pd
 from tqdm import tqdm
-from functools import cache
+from functools import cache,cached_property
 # from shutil import get_terminal_size
 # pd.set_option('display.width', get_terminal_size()[0])
 # from numpy import nan,ptp
@@ -447,14 +447,17 @@ class TimeBudgetRecorder():
 _default_recorder = TimeBudgetRecorder()  
 
 
-def annotate(func:Callable, quiet:Optional[bool],withcache:Optional[bool]):
+def annotate(func:Callable, quiet:Optional[bool],withcache:Optional[bool],cacheproperty:Optional[bool]):
     """Annotates a function or code-block to record how long the execution takes.
     Print summary with timebudget.report
     """
     name = func.__name__
 
     if withcache:
-        func = cache(func)
+        if not cacheproperty:
+            func = cache(func)
+        else:
+            func = cache_property(func)
         # print(f"caching added to function:{name}")
 
     @wraps(func)
@@ -478,7 +481,7 @@ class _timeblock():
         with timebudget('loadfile'):
     """
 
-    def __init__(self, name:str, quiet:Optional[bool],withcache:Optional[bool]):
+    def __init__(self, name:str, quiet:Optional[bool],withcache:Optional[bool],cacheproperty:Optional[bool]):
         self.name = name
         self.quiet = quiet
 
@@ -490,19 +493,31 @@ class _timeblock():
         _default_recorder.end(self.name, self.quiet)
 
 
-def annotate_or_with_block(func_or_name:Union[Callable, str], quiet:Optional[bool]=None,withcache:Optional[bool]=False):
+def annotate_or_with_block(func_or_name:Union[Callable, str], quiet:Optional[bool]=None,withcache:Optional[bool]=False,cacheproperty:Optional[bool]=False):
     if callable(func_or_name):
-        return annotate(func_or_name, quiet,withcache)
+        return annotate(func_or_name, quiet,withcache,cacheproperty)
     if isinstance(func_or_name, str):
-        return _timeblock(func_or_name, quiet,withcache)
+        return _timeblock(func_or_name, quiet,withcache,cacheproperty)
     raise RuntimeError("timebudget: Don't know what to do. Either @annotate or with:block")
 
-def annotate_or_with_block_cached(func_or_name:Union[Callable, str], quiet:Optional[bool]=None,withcache:Optional[bool]=True):
-    if callable(func_or_name):
-        return annotate(func_or_name, quiet,withcache)
-    if isinstance(func_or_name, str):
-        return _timeblock(func_or_name, quiet,withcache)
-    raise RuntimeError("timebudget: Don't know what to do. Either @annotate or with:block")
+
+
+annotate_cache = partial(annotate_or_with_block,quiet=True,withcache=True,cacheproperty=False)
+annotate_cached_property = partial(annotate_or_with_block,quiet=True,withcache=True,cacheproperty=True)
+
+# def annotate_or_with_block_cached(func_or_name:Union[Callable, str], quiet:Optional[bool]=None,withcache:Optional[bool]=True,cacheproperty:Optional[bool]=False):
+#     if callable(func_or_name):
+#         return annotate(func_or_name, quiet,withcache,cacheproperty)
+#     if isinstance(func_or_name, str):
+#         return _timeblock(func_or_name, quiet,withcache,cacheproperty)
+#     raise RuntimeError("timebudget: Don't know what to do. Either @annotate or with:block")
+
+# def annotate_or_with_block_cache_property(func_or_name:Union[Callable, str], quiet:Optional[bool]=None,withcache:Optional[bool]=True,cacheproperty:Optional[bool]=True):
+#     if callable(func_or_name):
+#         return annotate(func_or_name, quiet,withcache)
+#     if isinstance(func_or_name, str):
+#         return _timeblock(func_or_name, quiet,withcache)
+#     raise RuntimeError("timebudget: Don't know what to do. Either @annotate or with:block")
 
 
 def set_quiet(quiet:bool=True):
@@ -521,7 +536,8 @@ def set_units(units='millisecond',uniform_units=True,sortbyKey=""):
 
 # Create shortcuts for export
 timebudget = annotate_or_with_block
-timebudget.cached = annotate_or_with_block_cached
+timebudget.cache = annotate_cache
+timebudget.cached_property = annotate_cached_property
 report = _default_recorder.report
 timebudget.report = report
 timebudget.__doc__ = __doc__

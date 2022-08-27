@@ -5,7 +5,7 @@ timebudget.report_at_exit()
 
 
 
-@timebudget.cached
+@timebudget.cache
 def simple_recursion_test(countdown=5):
     time.sleep(0.1)
     if countdown == 0:
