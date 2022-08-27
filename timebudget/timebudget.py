@@ -19,15 +19,17 @@ timebudget.set_quiet()  # Sets `quiet=True` as global default
 timebudget.report()  # prints a summary of all annotated functions
 """
 import atexit
-from collections import defaultdict
+from collections import defaultdict,Counter
 from functools import wraps
 import sys
 import time
-from typing import Callable, Optional, Union
+from typing import Callable, Optional, Union,List
+from dataclasses import dataclass,field
 import tabulate
 import warnings
 import pint
 import pandas as pd
+from tqdm import tqdm
 # from shutil import get_terminal_size
 # pd.set_option('display.width', get_terminal_size()[0])
 # from numpy import nan,ptp
@@ -44,6 +46,53 @@ __all__ = [
     'report', 
     'set_quiet',
 ]
+
+
+
+# this data class exists to store timestamps for function calls as fast as possible 
+# duration and other features are computed during the report_at_exit phase unless they are 
+# needed earlier
+@dataclass
+class TimeDurationRecord:
+    name:str
+    startns:int
+    endns:int = -1
+    duration:int = -1
+    finished:bool = False
+    pauses:List = field(default_factory=list)
+    resumes:List = field(default_factory=list)
+
+    def __init__(self,name):
+        self.startns = time.monotonic_ns()
+        self.name = name
+        self.pauses = []
+        self.resumes = []
+
+
+    def end(self):
+        self.endns = time.monotonic_ns()
+        self.finished = True
+
+    def pause(self):
+        self.pauses.append(time.monotonic_ns())
+
+    def resume(self):
+        self.resumes.append(time.monotonic_ns())
+
+
+    def computeDuration(self):
+        # print(f"{self.startns=},{self.endns=}")
+        # print(f"{self.pauses=},{self.resumes=}")
+        # print(f"{self.resumes[0]=},{self.pauses[0]=},{self.resumes[0]-self.pauses[0]}")
+        # print(f"{self.endns-self.startns=}")
+        # print(f"total paused duration={sum([a-b for a,b in zip(self.resumes,self.pauses)])}")
+        # print(f"duration around pauses:{(self.endns - self.startns) - sum([a-b for a,b in zip(self.resumes,self.pauses)])}")
+        self.duration = self.endns - self.startns - sum([a-b for a,b in zip(self.resumes,self.pauses)])
+        # print(f"{self.duration=}")
+
+
+
+
 
 class TimeBudgetRecorder():
     """The object that stores times used for different things and generates reports.
@@ -76,9 +125,14 @@ class TimeBudgetRecorder():
     def reset(self):
         """Clear all stats collected so far.
         """
-        self.start_times = {}
+        self.start_times = defaultdict(list)
+        self.last_started_idx = defaultdict(list)
+        self.last_finished_idx = defaultdict(list)
+        self.actively_running = Counter()
+        self.started_count = Counter()
+        self.finished_count = Counter()
         # self.elapsed_total = defaultdict(float)  # float defaults to 0
-        self.elapsed_total = {}  # float defaults to 0
+        self.elapsed_total = defaultdict(list)  # float defaults to 0
         # self.elapsed_min = defaultdict(float)  # float defaults to 0
         # self.elapsed_max = defaultdict(float)  # float defaults to 0
         # self.elapsed_cnt = defaultdict(int)  # int defaults to 0
@@ -88,34 +142,82 @@ class TimeBudgetRecorder():
         self.out_stream.write("\n")
         self.out_stream.flush()
 
+
     def start(self, block_name:str):
-        if block_name in self.start_times:
-            # End should clear out the record, so something odd has happened here.
-            # try/finally should prevent this, but sometimes it doesn't.
-            warnings.warn(f"timebudget is confused: timebudget.start({block_name}) without end")
-        self.start_times[block_name] = time.monotonic_ns()
+        # print(f"started block={block_name}")
+
+        # some call to the function has been called recursively earlier
+        # include a pausing timestamp 
+        # if len(self.last_started_idx[block_name])-1 != self.last_started_idx[block_name][-1]:
+        if self.actively_running[block_name] > 0: 
+            # activeIdx = self.last_started_idx[block_name][-1]
+            self.start_times[block_name][self.last_started_idx[block_name][-1]].pause()
+
+
+        # if len(self.start_times[block_name]) > 0 and self.start_times[block_name][-1].finished is False:
+        #     # End should clear out the record, so something odd has happened here.
+        #     # try/finally should prevent this, but sometimes it doesn't.
+        #     warnings.warn(f"timebudget is confused: timebudget.start({block_name}) without end")
+
+        self.start_times[block_name].append(TimeDurationRecord(block_name))
+
+        # add the index of the started record to the monitoring list
+        self.last_started_idx[block_name].append(len(self.start_times[block_name])-1)
+        self.actively_running[block_name] += 1
         # print(f"{self.start_times[block_name]=}")
 
-    def end(self, block_name:str, quiet:Optional[bool]=None) -> float:
+
+
+
+
+
+    def end(self, block_name:str, quiet:Optional[bool]=None):
         """Returns number of ms spent in this block this time.
         """
         if quiet is None:
             quiet = self.quiet_mode
-        if block_name not in self.start_times:
-            warnings.warn(f"timebudget is confused: timebudget.end({block_name}) without start")
-            return float('NaN')
-        elapsed = (time.monotonic_ns() - self.start_times[block_name])
+        # if block_name not in self.start_times:
+        #     warnings.warn(f"timebudget is confused: timebudget.end({block_name}) without start")
+        #     return float('NaN')
+        # elapsed = (time.monotonic_ns() - self.start_times[block_name])
+
+        # print(f"{self.last_started_idx=}")
+        # print(f"{self.started_count=}")
+        # print(f"{self.actively_running=}")
+
+        # activeIdx = self.last_started_idx[block_name].pop()
+
+        self.start_times[block_name][self.last_started_idx[block_name].pop()].end()
+        self.actively_running[block_name] -=1
+        self.finished_count[block_name] += 1
+
+        # if there are still indicies for actively running functions of the same name
+
+        if self.actively_running[block_name] > 0:
+            # activeIdx = self.last_started_idx[block_name][-1]
+            self.start_times[block_name][self.last_started_idx[block_name][-1]].resume()
+
+        # the started function has been closed like a normal call
+        # if self.started_count[block_name]-1 == self.finished_count[block_name]:
+        # else:
+
+        # print(f"{self.start_times=}")
+            
+
+
+
+
         # print(f"{elapsed=}")
-        if block_name not in self.elapsed_total:
-            self.elapsed_total[block_name] = [elapsed]
-        else:
-            self.elapsed_total[block_name].append(elapsed)
+        # if block_name not in self.elapsed_total:
+        #     self.elapsed_total[block_name] = [elapsed]
+        # else:
+        # self.elapsed_total[block_name].append(self.start_times[block_name][-1])
         # self.elapsed_cnt[block_name] += 1
-        del self.start_times[block_name]
-        if not quiet:
-            self._print(f"{block_name} took {(elapsed * self.ureg.nanosecond).to(self.timeunit)}")
-            # pass
-        return elapsed
+        # del self.start_times[block_name]
+        # if not quiet:
+        #     self._print(f"{block_name} took {(elapsed * self.ureg.nanosecond).to(self.timeunit)}")
+        #     # pass
+        # return elapsed
 
     # def time_format(self, ns_duration:int) -> str:
     #     assert ns_duration >= 0
@@ -160,6 +262,7 @@ class TimeBudgetRecorder():
         # print(quantity)
         print(quantity.to_compact().units)
         return quantity.to_compact().units
+
 
     def roundFieldAfterConversion(self,field,conversionString):
         field = field.pint.to(conversionString)
@@ -289,6 +392,18 @@ class TimeBudgetRecorder():
         return rawDataFrame
 
 
+    def processTimeRecords(self):
+        for k,data in tqdm(self.start_times.items(),desc="Processing time records"):
+            for record in data:
+                record.computeDuration()
+                self.elapsed_total[k].append(record.duration)
+
+        self.start_times = defaultdict(list)
+
+        # print(f"{self.elapsed_total=}")
+
+
+
     def report(self, percent_of:str=None, reset:bool=False):
         self.globalEndTime = time.monotonic_ns()
         self.totalRunningTime = self.globalEndTime - self.globalStartTime
@@ -297,6 +412,7 @@ class TimeBudgetRecorder():
         If `reset` is set, then all stats will be cleared after this report.
         If `uniform_units` is set, then all time values will use the same (smallest) unit value.
         """
+        self.processTimeRecords()
 
         results = self._compileResults()
 
@@ -314,11 +430,16 @@ class TimeBudgetRecorder():
 _default_recorder = TimeBudgetRecorder()  
 
 
-def annotate(func:Callable, quiet:Optional[bool]):
+def annotate(func:Callable, quiet:Optional[bool],withcache:Optional[bool]):
     """Annotates a function or code-block to record how long the execution takes.
     Print summary with timebudget.report
     """
     name = func.__name__
+
+    if withcache:
+        func = cache(func)
+        print("caching added to function")
+
     @wraps(func)
     def inner(*args, **kwargs):
         _default_recorder.start(name)
@@ -328,12 +449,13 @@ def annotate(func:Callable, quiet:Optional[bool]):
             _default_recorder.end(name, quiet)
     return inner
 
+
 class _timeblock():
     """Surround a code-block with a timer as in
         with timebudget('loadfile'):
     """
 
-    def __init__(self, name:str, quiet:Optional[bool]):
+    def __init__(self, name:str, quiet:Optional[bool],withcache:Optional[bool]):
         self.name = name
         self.quiet = quiet
 
@@ -341,14 +463,15 @@ class _timeblock():
         _default_recorder.start(self.name)
 
     def __exit__(self, typ, val, trace):
+        # print(f"Exiting {self.name=}")
         _default_recorder.end(self.name, self.quiet)
 
 
-def annotate_or_with_block(func_or_name:Union[Callable, str], quiet:Optional[bool]=None):
+def annotate_or_with_block(func_or_name:Union[Callable, str], quiet:Optional[bool]=None,withcache:Optional[bool]=False):
     if callable(func_or_name):
-        return annotate(func_or_name, quiet)
+        return annotate(func_or_name, quiet,withcache)
     if isinstance(func_or_name, str):
-        return _timeblock(func_or_name, quiet)
+        return _timeblock(func_or_name, quiet,withcache)
     raise RuntimeError("timebudget: Don't know what to do. Either @annotate or with:block")
 
 
@@ -358,6 +481,7 @@ def set_quiet(quiet:bool=True):
     Alternately, you can reverse this by calling set_quiet(False).
     """
     _default_recorder.quiet_mode = quiet
+
 
 def set_units(units='millisecond',uniform_units=True,sortbyKey=""):
     _default_recorder.timeunit = _default_recorder.ureg[units]

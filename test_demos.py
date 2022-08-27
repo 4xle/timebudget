@@ -22,3 +22,11 @@ def test_demo5():
 def test_demo6():
     print("testing uniform units=True")
     import demo6
+
+def test_demo7():
+    print("testing simple recursion")
+    import demo7
+
+def test_demo8():
+    print("testing complex recursion")
+    import demo8
