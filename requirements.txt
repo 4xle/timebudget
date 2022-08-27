@@ -1,3 +1,7 @@
-pint==0.19.2
-pytest==7.1.2
-setuptools==62.2.0
+numpy==1.17.4
+pandas==1.4.3
+Pint==0.19.2
+Pint_Pandas==0.2
+pytest==7.1.2setuptools==45.2.0
+tabulate==0.8.10
+tqdm==4.64.0

@@ -30,13 +30,14 @@ import warnings
 import pint
 import pandas as pd
 from tqdm import tqdm
+from functools import cache
 # from shutil import get_terminal_size
 # pd.set_option('display.width', get_terminal_size()[0])
 # from numpy import nan,ptp
 import numpy as np
 import pint_pandas
 pint_pandas.PintType.ureg.default_format = "~P"
-from rich_dataframe import prettify
+# from rich_dataframe import prettify
 from pprint import pprint
 
 
@@ -112,6 +113,7 @@ class TimeBudgetRecorder():
         self.timeunit = self.ureg[units]
         self.uniform_units = uniform_units
         self.sortbyKey=sortbyKey
+        self.cache_data = {}
         if self.uniform_units:
             self.ureg.default_format='~'
             pint_pandas.PintType.ureg.default_format = "~"
@@ -361,6 +363,19 @@ class TimeBudgetRecorder():
             rawDataFrame[f] = pint_pandas.PintArray(np.around(operationMapping[f](internalDataFrame),2),dtype=f"pint[{fieldUnitMapping[f]}]")
 
 
+        print(rawDataFrame)
+        rawDataFrame['calls'] = rawDataFrame['calls'].astype(int).astype(str) 
+        rawDataFrame['pct'] = rawDataFrame['pct'].astype(str) 
+        for f,data in self.cache_data.items():
+            print(rawDataFrame['calls'])
+            print(rawDataFrame['calls'][f])
+            
+            cacheHitPercent = round((data.hits/int(rawDataFrame['calls'][f]))*float(rawDataFrame['pct'][f]),1)
+            cacheMissPercent = round((data.misses/int(rawDataFrame['calls'][f]))*float(rawDataFrame['pct'][f]),1)
+            rawDataFrame['pct'][f] = f"{rawDataFrame['pct'][f]} ({cacheHitPercent}/{cacheMissPercent}))"
+
+            rawDataFrame['calls'][f] = f"{rawDataFrame['calls'][f]} ({data.hits}/{data.misses}/{data.currsize})"
+
         if len(self.sortbyKey) == 0:
             rawDataFrame = rawDataFrame.sort_values("pct",ascending=False)
         else:
@@ -402,6 +417,8 @@ class TimeBudgetRecorder():
 
         # print(f"{self.elapsed_total=}")
 
+    def log_cache_data(self, name, data):
+        self.cache_data[name] = data
 
 
     def report(self, percent_of:str=None, reset:bool=False):
@@ -438,7 +455,7 @@ def annotate(func:Callable, quiet:Optional[bool],withcache:Optional[bool]):
 
     if withcache:
         func = cache(func)
-        print("caching added to function")
+        # print(f"caching added to function:{name}")
 
     @wraps(func)
     def inner(*args, **kwargs):
@@ -447,6 +464,12 @@ def annotate(func:Callable, quiet:Optional[bool],withcache:Optional[bool]):
             return func(*args, **kwargs)
         finally:
             _default_recorder.end(name, quiet)
+
+            if withcache:
+                _default_recorder.log_cache_data(name, func.cache_info())
+
+            # if withcache:
+            #     print(f"{name=},{func.cache_info()=}")
     return inner
 
 
@@ -474,6 +497,13 @@ def annotate_or_with_block(func_or_name:Union[Callable, str], quiet:Optional[boo
         return _timeblock(func_or_name, quiet,withcache)
     raise RuntimeError("timebudget: Don't know what to do. Either @annotate or with:block")
 
+def annotate_or_with_block_cached(func_or_name:Union[Callable, str], quiet:Optional[bool]=None,withcache:Optional[bool]=True):
+    if callable(func_or_name):
+        return annotate(func_or_name, quiet,withcache)
+    if isinstance(func_or_name, str):
+        return _timeblock(func_or_name, quiet,withcache)
+    raise RuntimeError("timebudget: Don't know what to do. Either @annotate or with:block")
+
 
 def set_quiet(quiet:bool=True):
     """Tell timebudget not to print time measurements on every call, but instead
@@ -491,6 +521,7 @@ def set_units(units='millisecond',uniform_units=True,sortbyKey=""):
 
 # Create shortcuts for export
 timebudget = annotate_or_with_block
+timebudget.cached = annotate_or_with_block_cached
 report = _default_recorder.report
 timebudget.report = report
 timebudget.__doc__ = __doc__
