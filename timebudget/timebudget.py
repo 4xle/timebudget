@@ -363,12 +363,12 @@ class TimeBudgetRecorder():
             rawDataFrame[f] = pint_pandas.PintArray(np.around(operationMapping[f](internalDataFrame),2),dtype=f"pint[{fieldUnitMapping[f]}]")
 
 
-        print(rawDataFrame)
+        # print(rawDataFrame)
         rawDataFrame['calls'] = rawDataFrame['calls'].astype(int).astype(str) 
         rawDataFrame['pct'] = rawDataFrame['pct'].astype(str) 
         for f,data in self.cache_data.items():
-            print(rawDataFrame['calls'])
-            print(rawDataFrame['calls'][f])
+            # print(rawDataFrame['calls'])
+            # print(rawDataFrame['calls'][f])
             
             cacheHitPercent = round((data.hits/int(rawDataFrame['calls'][f]))*float(rawDataFrame['pct'][f]),1)
             cacheMissPercent = round((data.misses/int(rawDataFrame['calls'][f]))*float(rawDataFrame['pct'][f]),1)
