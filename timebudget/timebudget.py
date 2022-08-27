@@ -457,7 +457,7 @@ def annotate(func:Callable, quiet:Optional[bool],withcache:Optional[bool],cachep
         if not cacheproperty:
             func = cache(func)
         else:
-            func = cache_property(func)
+            func = cached_property(func)
         # print(f"caching added to function:{name}")
 
     @wraps(func)
