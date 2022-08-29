@@ -129,10 +129,10 @@ class TimeBudgetRecorder():
         """
         self.start_times = defaultdict(list)
         self.last_started_idx = defaultdict(list)
-        self.last_finished_idx = defaultdict(list)
+        # self.last_finished_idx = defaultdict(list)
         self.actively_running = Counter()
-        self.started_count = Counter()
-        self.finished_count = Counter()
+        # self.started_count = Counter()
+        # self.finished_count = Counter()
         # self.elapsed_total = defaultdict(float)  # float defaults to 0
         self.elapsed_total = defaultdict(list)  # float defaults to 0
         # self.elapsed_min = defaultdict(float)  # float defaults to 0
@@ -200,37 +200,37 @@ class TimeBudgetRecorder():
             self.start_times[block_name][self.last_started_idx[block_name][-1]].resume()
 
 
-    def _formatResults(self, res):
-        if self.uniform_units:
-            formattedDict = {
-                'name': f"{res['name']:>25s}",
-                'total': f"{res['total']:8.3f~}",
-                'cnt': f"{res['cnt']}",
-                # 'pct':f"{pct: 6.1f}",
-                # 'avg_cnt':f"{avg_cnt:8.3f}",
-                'avg': f"{res['avg']:8.3f~}",
-                'min': f"{res['min']:8.3f~}",
-                'max': f"{res['max']:8.3f~}",
-                'diff': f"{res['diff']:8.3f~}",
-                'sd':f"{res['sd']:8.3f~}",
-                'var':f"{res['var']:8.3f~P}"
-            }
-        else:
-            formattedDict = {
-                'name': f"{res['name']:>25s}",
-                'total': f"{res['total']:8.3f~#P}",
-                'cnt': f"{res['cnt']}",
-                # 'pct':f"{pct: 6.1f}",
-                # 'avg_cnt':f"{avg_cnt:8.3f}",
-                'avg': f"{res['avg']:8.3f~#P}",
-                'min': f"{res['min']:8.3f~#P}",
-                'max': f"{res['max']:8.3f~#P}",
-                'diff': f"{res['diff']:8.3f~#P}",
-                'sd':f"{res['sd']:8.3f~#P}",
-                'var':f"{res['var']:8.3f~#P}"
-            }
+    # def _formatResults(self, res):
+    #     if self.uniform_units:
+    #         formattedDict = {
+    #             'name': f"{res['name']:>25s}",
+    #             'total': f"{res['total']:8.3f~}",
+    #             'cnt': f"{res['cnt']}",
+    #             # 'pct':f"{pct: 6.1f}",
+    #             # 'avg_cnt':f"{avg_cnt:8.3f}",
+    #             'avg': f"{res['avg']:8.3f~}",
+    #             'min': f"{res['min']:8.3f~}",
+    #             'max': f"{res['max']:8.3f~}",
+    #             'diff': f"{res['diff']:8.3f~}",
+    #             'sd':f"{res['sd']:8.3f~}",
+    #             'var':f"{res['var']:8.3f~P}"
+    #         }
+    #     else:
+    #         formattedDict = {
+    #             'name': f"{res['name']:>25s}",
+    #             'total': f"{res['total']:8.3f~#P}",
+    #             'cnt': f"{res['cnt']}",
+    #             # 'pct':f"{pct: 6.1f}",
+    #             # 'avg_cnt':f"{avg_cnt:8.3f}",
+    #             'avg': f"{res['avg']:8.3f~#P}",
+    #             'min': f"{res['min']:8.3f~#P}",
+    #             'max': f"{res['max']:8.3f~#P}",
+    #             'diff': f"{res['diff']:8.3f~#P}",
+    #             'sd':f"{res['sd']:8.3f~#P}",
+    #             'var':f"{res['var']:8.3f~#P}"
+    #         }
 
-        return formattedDict
+        # return formattedDict
 
 
     def _findSmallestPintUnit(self, quantity):
@@ -340,14 +340,16 @@ class TimeBudgetRecorder():
         rawDataFrame['calls'] = rawDataFrame['calls'].astype(int).astype(str) 
         rawDataFrame['pct'] = rawDataFrame['pct'].astype(str) 
         for f,data in self.cache_data.items():
+            # print(f"{data.cache_info()=}")
+            cacheData = data.cache_info()
             # print(rawDataFrame['calls'])
             # print(rawDataFrame['calls'][f])
             
-            cacheHitPercent = round((data.hits/int(rawDataFrame['calls'][f]))*float(rawDataFrame['pct'][f]),1)
-            cacheMissPercent = round((data.misses/int(rawDataFrame['calls'][f]))*float(rawDataFrame['pct'][f]),1)
+            cacheHitPercent = round((cacheData.hits/int(rawDataFrame['calls'][f]))*float(rawDataFrame['pct'][f]),1)
+            cacheMissPercent = round((cacheData.misses/int(rawDataFrame['calls'][f]))*float(rawDataFrame['pct'][f]),1)
             rawDataFrame['pct'][f] = f"{rawDataFrame['pct'][f]} ({cacheHitPercent}/{cacheMissPercent}))"
 
-            rawDataFrame['calls'][f] = f"{rawDataFrame['calls'][f]} ({data.hits}/{data.misses}/{data.currsize})"
+            rawDataFrame['calls'][f] = f"{rawDataFrame['calls'][f]} ({cacheData.hits}/{cacheData.misses}/{cacheData.currsize})"
 
         if len(self.sortbyKey) == 0:
             rawDataFrame = rawDataFrame.sort_values("pct",ascending=False)
@@ -390,8 +392,14 @@ class TimeBudgetRecorder():
 
         # print(f"{self.elapsed_total=}")
 
-    def log_cache_data(self, name, data):
-        self.cache_data[name] = data
+    # def log_cache_data(self, name, data):
+    #     self.cache_data[name] = data
+
+
+    # def getFunctionCacheData(self):
+        # # for each function that has been run
+        # for k in self.elapsed_total:
+        #     self.cache_data[k] = self.
 
 
     def report(self, percent_of:str=None, reset:bool=False):
@@ -421,18 +429,18 @@ class TimeBudgetRecorder():
 _default_recorder = TimeBudgetRecorder()  
 
 
-def annotate(func:Callable, quiet:Optional[bool],withcache:Optional[bool],cacheproperty:Optional[bool]):
+def annotate(func:Callable, quiet:Optional[bool]):
     """Annotates a function or code-block to record how long the execution takes.
     Print summary with timebudget.report
     """
     name = func.__name__
 
-    if withcache:
-        if not cacheproperty:
-            func = cache(func)
-        else:
-            func = cached_property(func)
-        # print(f"caching added to function:{name}")
+    # if not cacheproperty and withcache:
+    #     # if not cacheproperty:
+    #     func = cache(func)
+    # elif cacheproperty and withcache:
+    #     func = cached_property(func)
+    #     # print(f"caching added to function:{name}")
 
     @wraps(func)
     def inner(*args, **kwargs):
@@ -442,8 +450,64 @@ def annotate(func:Callable, quiet:Optional[bool],withcache:Optional[bool],cachep
         finally:
             _default_recorder.end(name, quiet)
 
-            if withcache:
-                _default_recorder.log_cache_data(name, func.cache_info())
+            # if withcache:
+                # _default_recorder.log_cache_data(name, func.cache_info())
+
+            # if withcache:
+            #     print(f"{name=},{func.cache_info()=}")
+    return inner
+
+
+def annotate_cache(func:Callable, quiet:Optional[bool]=False):
+    """Annotates a function or code-block to record how long the execution takes.
+    Print summary with timebudget.report
+    """
+    name = func.__name__
+    func = cache(func)
+
+    # this should be quick to shortcut as it is "sargeable" (more of a SQL thing but similar principle, perhaps?) 
+    # would this be accelerated even more with a SortedDict?
+    if name in _default_recorder.cache_data:
+        pass
+    else:
+        _default_recorder.cache_data[name] = func
+        # print(f"{_default_recorder.cache_data[name]=}")
+    
+
+    @wraps(func)
+    def inner(*args, **kwargs):
+        _default_recorder.start(name)
+        try:
+            return func(*args, **kwargs)
+        finally:
+            _default_recorder.end(name, quiet)
+
+            # if withcache:
+                # _default_recorder.log_cache_data(name, func.cache_info())
+
+            # if withcache:
+            #     print(f"{name=},{func.cache_info()=}")
+    return inner
+
+
+def annotate_cached_property(func:Callable, quiet:Optional[bool]=False):
+    """Annotates a function or code-block to record how long the execution takes.
+    Print summary with timebudget.report
+    """
+    name = func.__name__
+    func = cached_property(func)
+    # print(f"caching added to function:{name}")
+
+    @wraps(func)
+    def inner(*args, **kwargs):
+        _default_recorder.start(name)
+        try:
+            return func(*args, **kwargs)
+        finally:
+            _default_recorder.end(name, quiet)
+
+            # if withcache:
+                # _default_recorder.log_cache_data(name, func.cache_info())
 
             # if withcache:
             #     print(f"{name=},{func.cache_info()=}")
@@ -455,7 +519,7 @@ class _timeblock():
         with timebudget('loadfile'):
     """
 
-    def __init__(self, name:str, quiet:Optional[bool],withcache:Optional[bool],cacheproperty:Optional[bool]):
+    def __init__(self, name:str, quiet:Optional[bool]):
         self.name = name
         self.quiet = quiet
 
@@ -467,17 +531,17 @@ class _timeblock():
         _default_recorder.end(self.name, self.quiet)
 
 
-def annotate_or_with_block(func_or_name:Union[Callable, str], quiet:Optional[bool]=None,withcache:Optional[bool]=False,cacheproperty:Optional[bool]=False):
+def annotate_or_with_block(func_or_name:Union[Callable, str], quiet:Optional[bool]=None):
     if callable(func_or_name):
-        return annotate(func_or_name, quiet,withcache,cacheproperty)
+        return annotate(func_or_name, quiet)
     if isinstance(func_or_name, str):
-        return _timeblock(func_or_name, quiet,withcache,cacheproperty)
+        return _timeblock(func_or_name, quiet)
     raise RuntimeError("timebudget: Don't know what to do. Either @annotate or with:block")
 
 
 
-annotate_cache = partial(annotate_or_with_block,quiet=True,withcache=True,cacheproperty=False)
-annotate_cached_property = partial(annotate_or_with_block,quiet=True,withcache=True,cacheproperty=True)
+# annotate_cache = partial(annotate_or_with_block,quiet=True,withcache=True,cacheproperty=False)
+# annotate_cached_property = partial(annotate_or_with_block,quiet=True,withcache=True,cacheproperty=True)
 
 # def annotate_or_with_block_cached(func_or_name:Union[Callable, str], quiet:Optional[bool]=None,withcache:Optional[bool]=True,cacheproperty:Optional[bool]=False):
 #     if callable(func_or_name):
