@@ -176,8 +176,8 @@ class TimeBudgetRecorder():
     def end(self, block_name:str, quiet:Optional[bool]=None):
         """Returns number of ms spent in this block this time.
         """
-        if quiet is None:
-            quiet = self.quiet_mode
+        # if quiet is None:
+        #     quiet = self.quiet_mode
         # if block_name not in self.start_times:
         #     warnings.warn(f"timebudget is confused: timebudget.end({block_name}) without start")
         #     return float('NaN')
@@ -191,40 +191,13 @@ class TimeBudgetRecorder():
 
         self.start_times[block_name][self.last_started_idx[block_name].pop()].end()
         self.actively_running[block_name] -=1
-        self.finished_count[block_name] += 1
+        # self.finished_count[block_name] += 1
 
         # if there are still indicies for actively running functions of the same name
 
         if self.actively_running[block_name] > 0:
             # activeIdx = self.last_started_idx[block_name][-1]
             self.start_times[block_name][self.last_started_idx[block_name][-1]].resume()
-
-        # the started function has been closed like a normal call
-        # if self.started_count[block_name]-1 == self.finished_count[block_name]:
-        # else:
-
-        # print(f"{self.start_times=}")
-            
-
-
-
-
-        # print(f"{elapsed=}")
-        # if block_name not in self.elapsed_total:
-        #     self.elapsed_total[block_name] = [elapsed]
-        # else:
-        # self.elapsed_total[block_name].append(self.start_times[block_name][-1])
-        # self.elapsed_cnt[block_name] += 1
-        # del self.start_times[block_name]
-        # if not quiet:
-        #     self._print(f"{block_name} took {(elapsed * self.ureg.nanosecond).to(self.timeunit)}")
-        #     # pass
-        # return elapsed
-
-    # def time_format(self, ns_duration:int) -> str:
-    #     assert ns_duration >= 0
-    #     value = ns_duration * self.ureg.nanosecond
-    #     return value.to_compact()
 
 
     def _formatResults(self, res):
@@ -262,7 +235,7 @@ class TimeBudgetRecorder():
 
     def _findSmallestPintUnit(self, quantity):
         # print(quantity)
-        print(quantity.to_compact().units)
+        # print(quantity.to_compact().units)
         return quantity.to_compact().units
 
 
@@ -435,7 +408,8 @@ class TimeBudgetRecorder():
 
         # print(prettify(results,delay_time=0.1,row_limit=len(self.elapsed_total.keys()),col_limit=len(results.columns)))
         print(tabulate.tabulate(results, tablefmt="github", headers="keys", showindex="always"))
-        print(f"Total logged time:{sum(results['sum'])}")
+        # print(f"Total logged time:{sum(results['sum'])}")
+        print(f"Total running time:{(self.totalRunningTime * self.ureg['nanosecond']).to(self.timeunit)}")
         # exit()
         
         if reset:
