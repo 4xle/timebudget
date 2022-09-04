@@ -23,7 +23,7 @@ def double_recursion_test(countdown=1):
         return double_recursion_test(countdown-1)
 
 
-@timebudget
+@timebudget(tag="bar:")
 def outer_recursion(countdown=1):
     simple_recursion_test(2)
 

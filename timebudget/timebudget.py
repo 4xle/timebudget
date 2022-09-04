@@ -509,7 +509,7 @@ def annotate_cached_property(func:Callable, quiet:Optional[bool]=False,tag:Optio
 
     if func is None:
         return partial(annotate_cached_property, quiet=quiet, tag=tag)
-    
+
     name = tag + func.__name__
     func = cached_property(func)
 
@@ -552,7 +552,12 @@ class _timeblock():
         _default_recorder.end(self.name, self.quiet)
 
 
-def annotate_or_with_block(func_or_name:Union[Callable, str], quiet:Optional[bool]=None, tag:Optional[str]=""):
+def annotate_or_with_block(func_or_name:Union[Callable, str]=None, quiet:Optional[bool]=None, tag:Optional[str]=""):
+
+
+    if func_or_name is None:
+        return partial(annotate_or_with_block, quiet=quiet, tag=tag)
+    
     if callable(func_or_name):
         return annotate(func_or_name, quiet,tag)
     if isinstance(func_or_name, str):
