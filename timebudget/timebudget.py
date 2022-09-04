@@ -554,13 +554,13 @@ class _timeblock():
 
 def annotate_or_with_block(func_or_name:Union[Callable, str]=None, quiet:Optional[bool]=None, tag:Optional[str]=""):
 
-
-    if func_or_name is None:
-        return partial(annotate_or_with_block, quiet=quiet, tag=tag)
-    
     if callable(func_or_name):
+        if func_or_name is None:
+            return partial(annotate, quiet=quiet, tag=tag)
         return annotate(func_or_name, quiet,tag)
     if isinstance(func_or_name, str):
+        if func_or_name is None:
+            return partial(_timeblock, quiet=quiet, tag=tag)
         return _timeblock(func_or_name, quiet,tag)
     raise RuntimeError("timebudget: Don't know what to do. Either @annotate or with:block")
 
