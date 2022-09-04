@@ -1,7 +1,8 @@
 import time
-from timebudget import timebudget
+from timebudget import annotate,timebudget
 timebudget.set_units("microsecond",uniform_units=True)
 timebudget.report_at_exit()
+timebudget.set_quiet()
 
 
 
@@ -14,7 +15,7 @@ def simple_recursion_test(countdown=5):
         return simple_recursion_test(countdown-1)
 
 
-@timebudget
+@timebudget.cache(tag="foo:")
 def double_recursion_test(countdown=1):
     if countdown == 0:
         return None

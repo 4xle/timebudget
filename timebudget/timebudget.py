@@ -30,7 +30,7 @@ import warnings
 import pint
 import pandas as pd
 from tqdm import tqdm
-from functools import cache,cached_property
+from functools import cache,cached_property,partial
 # from shutil import get_terminal_size
 # pd.set_option('display.width', get_terminal_size()[0])
 # from numpy import nan,ptp
@@ -429,11 +429,17 @@ class TimeBudgetRecorder():
 _default_recorder = TimeBudgetRecorder()  
 
 
-def annotate(func:Callable, quiet:Optional[bool]):
+def annotate(func:Callable=None, quiet:Optional[bool]=False, tag:Optional[str]=""):
     """Annotates a function or code-block to record how long the execution takes.
     Print summary with timebudget.report
     """
-    name = func.__name__
+
+    # if keywords are given for a decorator definition
+    if func is None:
+        return partial(annotate, quiet=quiet, tag=tag)
+
+    name = tag + func.__name__
+    # print(f"annotate name: {name}")
 
     # if not cacheproperty and withcache:
     #     # if not cacheproperty:
@@ -458,12 +464,18 @@ def annotate(func:Callable, quiet:Optional[bool]):
     return inner
 
 
-def annotate_cache(func:Callable, quiet:Optional[bool]=False):
+def annotate_cache(func:Callable=None, quiet:Optional[bool]=False, tag:Optional[str]=""):
     """Annotates a function or code-block to record how long the execution takes.
     Print summary with timebudget.report
     """
-    name = func.__name__
+
+    if func is None:
+        return partial(annotate_cache, quiet=quiet, tag=tag)
+
+
+    name = tag + func.__name__
     func = cache(func)
+
 
     # this should be quick to shortcut as it is "sargeable" (more of a SQL thing but similar principle, perhaps?) 
     # would this be accelerated even more with a SortedDict?
@@ -490,12 +502,21 @@ def annotate_cache(func:Callable, quiet:Optional[bool]=False):
     return inner
 
 
-def annotate_cached_property(func:Callable, quiet:Optional[bool]=False):
+def annotate_cached_property(func:Callable, quiet:Optional[bool]=False,tag:Optional[str]=""):
     """Annotates a function or code-block to record how long the execution takes.
     Print summary with timebudget.report
     """
-    name = func.__name__
+
+    if func is None:
+        return partial(annotate_cached_property, quiet=quiet, tag=tag)
+    
+    name = tag + func.__name__
     func = cached_property(func)
+
+    if name in _default_recorder.cache_data:
+        pass
+    else:
+        _default_recorder.cache_data[name] = func
     # print(f"caching added to function:{name}")
 
     @wraps(func)
@@ -531,11 +552,11 @@ class _timeblock():
         _default_recorder.end(self.name, self.quiet)
 
 
-def annotate_or_with_block(func_or_name:Union[Callable, str], quiet:Optional[bool]=None):
+def annotate_or_with_block(func_or_name:Union[Callable, str], quiet:Optional[bool]=None, tag:Optional[str]=""):
     if callable(func_or_name):
-        return annotate(func_or_name, quiet)
+        return annotate(func_or_name, quiet,tag)
     if isinstance(func_or_name, str):
-        return _timeblock(func_or_name, quiet)
+        return _timeblock(func_or_name, quiet,tag)
     raise RuntimeError("timebudget: Don't know what to do. Either @annotate or with:block")
 
 
@@ -574,6 +595,7 @@ def set_units(units='millisecond',uniform_units=True,sortbyKey=""):
 
 # Create shortcuts for export
 timebudget = annotate_or_with_block
+timebudget.annotate = annotate
 timebudget.cache = annotate_cache
 timebudget.cached_property = annotate_cached_property
 report = _default_recorder.report
